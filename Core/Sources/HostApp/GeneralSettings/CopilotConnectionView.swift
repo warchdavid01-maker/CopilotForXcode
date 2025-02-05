@@ -21,7 +21,7 @@ struct CopilotConnectionView: View {
     var accountStatus: some View {
         SettingsButtonRow(
             title: "GitHub Account Status Permissions",
-            subtitle: "GitHub Connection: \(viewModel.status?.description ?? "Loading...")"
+            subtitle: "GitHub Account: \(viewModel.status?.description ?? "Loading...")"
         ) {
             if viewModel.isRunningAction || viewModel.waitingForSignIn {
                 ProgressView().controlSize(.small)
@@ -34,7 +34,7 @@ struct CopilotConnectionView: View {
                     viewModel.cancelWaiting()
                 }
             } else if viewModel.status == .notSignedIn {
-                Button("Login to GitHub") {
+                Button("Log in to GitHub") {
                     viewModel.signIn()
                 }
                 .alert(
@@ -56,7 +56,7 @@ struct CopilotConnectionView: View {
             if viewModel.status == .ok || viewModel.status == .alreadySignedIn ||
                 viewModel.status == .notAuthorized
             {
-                Button("Logout from GitHub") { viewModel.signOut()
+                Button("Log Out from GitHub") { viewModel.signOut()
                     viewModel.isSignInAlertPresented = false
                 }
             }
@@ -64,9 +64,16 @@ struct CopilotConnectionView: View {
     }
 
     var connection: some View {
-        SettingsSection(title: "Copilot Connection") {
+        SettingsSection(title: "Account Settings", showWarning: viewModel.status == .notAuthorized) {
             accountStatus
             Divider()
+            if viewModel.status == .notAuthorized {
+                SettingsLink(
+                    url: "https://github.com/features/copilot/plans",
+                    title: "Enable powerful AI features for free with the GitHub Copilot Free plan"
+                )
+                Divider()
+            }
             SettingsLink(
                 url: "https://github.com/settings/copilot",
                 title: "GitHub Copilot Account Settings"

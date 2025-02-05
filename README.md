@@ -37,7 +37,13 @@ Use of the GitHub Copilot Xcode Extension is subject to [GitHub's Pre-Release Te
 
    Updates can be downloaded and installed by the app.
 
-1. A background item will be added to enable Copilot to start when Xcode is opened.
+1. Open the `GitHub Copilot for Xcode` application (from the `Applications` folder). Accept the security warning.
+   <p align="center">
+     <img alt="Screenshot of MacOS download permission request" src="./Docs/macos-download-open-confirm.png" width="529" />
+   </p>
+
+
+1. A background item will be added to enable Copilot to start when `GitHub Copilot for Xcode` is opened.
    <p align="center">
      <img alt="Screenshot of background item" src="./Docs/background-item.png" width="370" />
    </p>
@@ -53,7 +59,7 @@ Use of the GitHub Copilot Xcode Extension is subject to [GitHub's Pre-Release Te
    </p>
 
    The `Xcode Source Editor Extension` permission needs to be enabled manually. Click
-   `Extension Permission` from the `Copilot for Xcode` settings to open the
+   `Extension Permission` from the `GitHub Copilot for Xcode` application settings to open the
    System Preferences to the `Extensions` panel. Select `Xcode Source Editor`
    and enable `GitHub Copilot`:
 
@@ -61,8 +67,8 @@ Use of the GitHub Copilot Xcode Extension is subject to [GitHub's Pre-Release Te
      <img alt="Screenshot of extension permission" src="./Docs/extension-permission.png" width="582" />
    </p>
 
-1. After granting the extension permission, please restart Xcode to ensure the
-   `Github Copilot` menu is available and not disabled under the Xcode `Editor`
+1. After granting the extension permission, open Xcode. Verify that the
+   `Github Copilot` menu is available and enabled under the Xcode `Editor`
    menu.
     <br>
     <p align="center">

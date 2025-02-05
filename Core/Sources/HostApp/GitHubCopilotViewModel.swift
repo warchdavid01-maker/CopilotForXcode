@@ -61,13 +61,6 @@ class GitHubCopilotViewModel: ObservableObject {
                 status = try await service.checkStatus()
                 version = try await service.version()
                 isRunningAction = false
-                
-                if status != .ok, status != .notSignedIn {
-                    toast(
-                        "GitHub Copilot status is not \"ok\". Please check if you have a valid GitHub Copilot subscription.",
-                        .error
-                    )
-                }
             } catch {
                 toast(error.localizedDescription, .error)
             }
