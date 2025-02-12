@@ -43,11 +43,11 @@ public final class BuiltinExtensionTelemetryServiceProvider<
 
     public func sendError(_ request: TelemetryExceptionRequest) async throws {
         guard let telemetryService else {
-            Logger.service.error("Builtin telemetry service not found.")
+            print("Builtin telemetry service not found.")
             throw BuiltinExtensionTelemetryServiceNotFoundError()
         }
         guard let workspaceInfo = await activeWorkspace() else {
-            Logger.service.error("Builtin active workspace info not found.")
+            print("Builtin active workspace info not found.")
             throw BuiltinExtensionActiveWorkspaceInfoNotFoundError()
         }
         
