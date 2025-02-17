@@ -9,8 +9,7 @@ public extension XcodeAppInstanceInspector {
             .object(forInfoDictionaryKey: "EXTENSION_BUNDLE_NAME") as! String
         
         guard await isBundleEnabled(bundleName: bundleName) else {
-            print("Bundle \(bundleName) is not enabled")
-            return
+            throw CantRunCommand(path: "Editor/\(bundleName)/\(name)", reason: "\(bundleName) is not enabled")
         }
         
         try await triggerMenuItem(path: ["Editor", bundleName, name], activateApp: activateXcode)
