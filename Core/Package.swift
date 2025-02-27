@@ -194,6 +194,10 @@ let package = Package(
                     .product(name: "SwiftUIFlowLayout", package: "swiftui-flow-layout")
                 ]
             ),
+            .testTarget(
+                name: "ConversationTabTests",
+                dependencies: ["ConversationTab"]
+            ),
         
         // MARK: - UI
         

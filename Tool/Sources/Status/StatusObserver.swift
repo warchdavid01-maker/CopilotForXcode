@@ -5,6 +5,7 @@ import Cache
 public class StatusObserver: ObservableObject {
     @Published public private(set) var authStatus = AuthStatus(status: .unknown, username: nil, message: nil)
     @Published public private(set) var clsStatus = CLSStatus(status: .unknown, message: "")
+    @Published public private(set) var observedAXStatus = ObservedAXStatus.unknown
     
     public static let shared = StatusObserver()
     
@@ -12,6 +13,7 @@ public class StatusObserver: ObservableObject {
         Task { @MainActor in
             await observeAuthStatus()
             await observeCLSStatus()
+            await observeAXStatus()
         }
     }
     
@@ -23,6 +25,11 @@ public class StatusObserver: ObservableObject {
     private func observeCLSStatus() async {
         await updateCLSStatus()
         setupCLSStatusNotificationObserver()
+    }
+    
+    private func observeAXStatus() async {
+        await updateAXStatus()
+        setupAXStatusNotificationObserver()
     }
     
     private func updateAuthStatus() async {
@@ -41,6 +48,10 @@ public class StatusObserver: ObservableObject {
     
     private func updateCLSStatus() async {
         self.clsStatus = await Status.shared.getCLSStatus()
+    }
+    
+    private func updateAXStatus() async {
+        self.observedAXStatus = await Status.shared.getAXStatus()
     }
     
     private func setupAuthStatusNotificationObserver() {
@@ -76,6 +87,19 @@ public class StatusObserver: ObservableObject {
             guard let self = self else { return }
             Task { @MainActor [self] in
                 await self.updateCLSStatus()
+            }
+        }
+    }
+    
+    private func setupAXStatusNotificationObserver() {
+        NotificationCenter.default.addObserver(
+            forName: .serviceStatusDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self = self else { return }
+            Task { @MainActor [self] in
+                await self.updateAXStatus()
             }
         }
     }

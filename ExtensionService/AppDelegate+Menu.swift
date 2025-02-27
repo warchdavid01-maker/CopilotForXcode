@@ -27,7 +27,6 @@ extension AppDelegate {
             withLength: NSStatusItem.squareLength
         )
         statusBarItem.button?.image = NSImage(named: "MenuBarIcon")
-        statusBarItem.button?.image?.isTemplate = false
 
         let statusBarMenu = NSMenu(title: "Status Bar Menu")
         statusBarMenu.identifier = statusBarMenuIdentifier
@@ -49,7 +48,7 @@ extension AppDelegate {
             keyEquivalent: ""
         )
 
-        let openCopilotForXcodeItem = NSMenuItem(
+        openCopilotForXcodeItem = NSMenuItem(
             title: "Settings",
             action: #selector(openCopilotForXcode),
             keyEquivalent: ""
@@ -66,12 +65,12 @@ extension AppDelegate {
         xcodeInspectorDebug.submenu = xcodeInspectorDebugMenu
         xcodeInspectorDebug.isHidden = false
 
-        extensionStatusItem = NSMenuItem(
+        axStatusItem = NSMenuItem(
             title: "",
             action: #selector(openExtensionStatusLink),
             keyEquivalent: ""
         )
-        extensionStatusItem.isHidden = true
+        axStatusItem.isHidden = true
 
         let quitItem = NSMenuItem(
             title: "Quit",
@@ -104,14 +103,14 @@ extension AppDelegate {
             action: nil,
             keyEquivalent: ""
         )
-        extensionStatusItem.isHidden = true
+        axStatusItem.isHidden = true
 
         upSellItem = NSMenuItem(
             title: "",
             action: #selector(openUpSellLink),
             keyEquivalent: ""
         )
-        extensionStatusItem.isHidden = true
+        axStatusItem.isHidden = true
 
         let openDocs = NSMenuItem(
             title: "View Documentation",
@@ -142,7 +141,7 @@ extension AppDelegate {
         statusBarMenu.addItem(authStatusItem)
         statusBarMenu.addItem(upSellItem)
         statusBarMenu.addItem(.separator())
-        statusBarMenu.addItem(extensionStatusItem)
+        statusBarMenu.addItem(axStatusItem)
         statusBarMenu.addItem(.separator())
         statusBarMenu.addItem(openCopilotForXcodeItem)
         statusBarMenu.addItem(.separator())

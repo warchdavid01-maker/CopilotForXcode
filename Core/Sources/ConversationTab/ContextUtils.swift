@@ -28,50 +28,118 @@ public struct ContextUtils {
 
     public static func getFilesInActiveWorkspace() -> [FileReference] {
         guard let workspaceURL = XcodeInspector.shared.realtimeActiveWorkspaceURL,
-              let projectURL = XcodeInspector.shared.realtimeActiveProjectURL else {
+              let workspaceRootURL = XcodeInspector.shared.realtimeActiveProjectURL else {
             return []
         }
 
+        return getFilesInActiveWorkspace(workspaceURL: workspaceURL, workspaceRootURL: workspaceRootURL)
+    }
+
+    static func getFilesInActiveWorkspace(workspaceURL: URL, workspaceRootURL: URL) -> [FileReference] {
+        var files: [FileReference] = []
         do {
             let fileManager = FileManager.default
-            let enumerator = fileManager.enumerator(
-                at: projectURL,
-                includingPropertiesForKeys: [.isRegularFileKey, .isDirectoryKey],
-                options: [.skipsHiddenFiles]
-            )
-
-            var files: [FileReference] = []
-            while let fileURL = enumerator?.nextObject() as? URL {
-                // Skip items matching the specified pattern
-                if matchesPatterns(fileURL, patterns: skipPatterns) {
-                    enumerator?.skipDescendants()
-                    continue
-                }
-
-                let resourceValues = try fileURL.resourceValues(forKeys: [.isRegularFileKey, .isDirectoryKey])
-                // Handle directories if needed
-                if resourceValues.isDirectory == true {
-                    continue
-                }
-
-                guard resourceValues.isRegularFile == true else { continue }
-                if supportedFileExtensions.contains(fileURL.pathExtension.lowercased()) == false {
-                    continue
-                }
-
-                let relativePath = fileURL.path.replacingOccurrences(of: projectURL.path, with: "")
-                let fileName = fileURL.lastPathComponent
-
-                let file = FileReference(url: fileURL,
-                                           relativePath: relativePath,
-                                           fileName: fileName)
-                files.append(file)
+            var subprojects: [URL] = []
+            if isXCWorkspace(workspaceURL) {
+                subprojects = getSubprojectURLs(in: workspaceURL)
+            } else {
+                subprojects.append(workspaceRootURL)
             }
+            for subproject in subprojects {
+                guard FileManager.default.fileExists(atPath: subproject.path) else {
+                    continue
+                }
 
-            return files
+                let enumerator = fileManager.enumerator(
+                    at: subproject,
+                    includingPropertiesForKeys: [.isRegularFileKey, .isDirectoryKey],
+                    options: [.skipsHiddenFiles]
+                )
+
+                while let fileURL = enumerator?.nextObject() as? URL {
+                    // Skip items matching the specified pattern
+                    if matchesPatterns(fileURL, patterns: skipPatterns)
+                        || isXCWorkspace(fileURL) || isXCProject(fileURL) {
+                        enumerator?.skipDescendants()
+                        continue
+                    }
+
+                    let resourceValues = try fileURL.resourceValues(forKeys: [.isRegularFileKey, .isDirectoryKey])
+                    // Handle directories if needed
+                    if resourceValues.isDirectory == true {
+                        continue
+                    }
+
+                    guard resourceValues.isRegularFile == true else { continue }
+                    if supportedFileExtensions.contains(fileURL.pathExtension.lowercased()) == false {
+                        continue
+                    }
+
+                    let relativePath = fileURL.path.replacingOccurrences(of: workspaceRootURL.path, with: "")
+                    let fileName = fileURL.lastPathComponent
+
+                    let file = FileReference(url: fileURL,
+                                               relativePath: relativePath,
+                                               fileName: fileName)
+                    files.append(file)
+                }
+            }
         } catch {
             Logger.client.error("Failed to get files in workspace: \(error)")
+        }
+
+        return files
+    }
+
+    static func isXCWorkspace(_ url: URL) -> Bool {
+        return url.pathExtension == "xcworkspace" && FileManager.default.fileExists(atPath: url.appendingPathComponent("contents.xcworkspacedata").path)
+    }
+
+    static func isXCProject(_ url: URL) -> Bool {
+        return url.pathExtension == "xcodeproj" && FileManager.default.fileExists(atPath: url.appendingPathComponent("project.pbxproj").path)
+    }
+
+    static func getSubprojectURLs(in workspaceURL: URL) -> [URL] {
+        let workspaceFile = workspaceURL.appendingPathComponent("contents.xcworkspacedata")
+        guard let data = try? Data(contentsOf: workspaceFile) else {
+            Logger.client.error("Failed to read workspace file at \(workspaceFile.path)")
             return []
         }
+
+        return getSubprojectURLs(workspaceURL: workspaceURL, data: data)
+    }
+
+    static func getSubprojectURLs(workspaceURL: URL, data: Data) -> [URL] {
+        var subprojectURLs: [URL] = []
+        do {
+            let xml = try XMLDocument(data: data)
+            let fileRefs = try xml.nodes(forXPath: "//FileRef")
+            for fileRef in fileRefs {
+                if let fileRefElement = fileRef as? XMLElement,
+                   let location = fileRefElement.attribute(forName: "location")?.stringValue {
+                    var path = ""
+                    if location.starts(with: "group:") {
+                        path = location.replacingOccurrences(of: "group:", with: "")
+                    } else if location.starts(with: "container:") {
+                        path = location.replacingOccurrences(of: "container:", with: "")
+                    } else {
+                        // Skip absolute paths such as absolute:/path/to/project
+                        continue
+                    }
+
+                    if path.hasSuffix(".xcodeproj") {
+                        path = (path as NSString).deletingLastPathComponent
+                    }
+                    let subprojectURL = path.isEmpty ? workspaceURL.deletingLastPathComponent() : workspaceURL.deletingLastPathComponent().appendingPathComponent(path)
+                    if !subprojectURLs.contains(subprojectURL) {
+                        subprojectURLs.append(subprojectURL)
+                    }
+                }
+            }
+        } catch {
+            Logger.client.error("Failed to parse workspace file: \(error)")
+        }
+
+        return subprojectURLs
     }
 }

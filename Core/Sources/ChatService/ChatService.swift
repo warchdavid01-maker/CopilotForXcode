@@ -88,6 +88,23 @@ public final class ChatService: ChatServiceType, ObservableObject {
         activeRequestId = workDoneToken
         
         await memory.appendMessage(ChatMessage(id: id, role: .user, content: content, references: []))
+        
+        if content.hasPrefix("/releaseNotes") {
+            if let fileURL = Bundle.main.url(forResource: "ReleaseNotes", withExtension: "md"),
+                let whatsNewContent = try? String(contentsOf: fileURL)
+            {
+                let progressMessage = ChatMessage(
+                    id: UUID().uuidString,
+                    role: .assistant,
+                    content: whatsNewContent,
+                    references: []
+                )
+                await memory.appendMessage(progressMessage)
+            }
+            resetOngoingRequest()
+            return
+        }
+        
         let skillCapabilities: [String] = [ CurrentEditorSkill.ID, ProblemsInActiveDocumentSkill.ID ]
         let supportedSkills: [String] = skillSet.map { $0.id }
         let ignoredSkills: [String] = skillCapabilities.filter {

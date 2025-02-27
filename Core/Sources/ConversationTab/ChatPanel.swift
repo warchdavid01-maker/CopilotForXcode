@@ -17,36 +17,40 @@ public struct ChatPanel: View {
     @Namespace var inputAreaNamespace
 
     public var body: some View {
-        VStack(spacing: 0) {
-            
-            if chat.history.isEmpty {
-                VStack {
-                    Spacer()
-                    Instruction()
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                .padding(.leading, -16)
-            } else {
-                ChatPanelMessages(chat: chat)
+        WithPerceptionTracking {
+            VStack(spacing: 0) {
                 
-                if chat.history.last?.role == .system {
-                    ChatCLSError(chat: chat).padding(.trailing, 16)
+                if chat.history.isEmpty {
+                    VStack {
+                        Spacer()
+                        Instruction()
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    .padding(.trailing, 16)
                 } else {
-                    ChatFollowUp(chat: chat)
-                        .padding(.trailing, 16)
-                        .padding(.vertical, 8)
+                    ChatPanelMessages(chat: chat)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("Chat Mesessages Group")
+                    
+                    if chat.history.last?.role == .system {
+                        ChatCLSError(chat: chat).padding(.trailing, 16)
+                    } else {
+                        ChatFollowUp(chat: chat)
+                            .padding(.trailing, 16)
+                            .padding(.vertical, 8)
 
+                    }
                 }
+                
+                ChatPanelInputArea(chat: chat)
+                    .padding(.trailing, 16)
             }
-            
-            ChatPanelInputArea(chat: chat)
-                .padding(.trailing, 16)
+            .padding(.leading, 16)
+            .padding(.bottom, 16)
+            .background(Color(nsColor: .windowBackgroundColor))
+            .onAppear { chat.send(.appear) }
         }
-        .padding(.leading, 16)
-        .padding(.bottom, 16)
-        .background(Color(nsColor: .windowBackgroundColor))
-        .onAppear { chat.send(.appear) }
     }
 }
 
@@ -120,8 +124,8 @@ struct ChatPanelMessages: View {
                                 view
                             }
                         }
-                        .padding(.leading, -8)
                     }
+                    .padding(.leading, -8)
                     .listStyle(.plain)
                     .listRowBackground(EmptyView())
                     .modify { view in
@@ -483,8 +487,6 @@ struct ChatPanelInputArea: View {
         @State var cancellable = Set<AnyCancellable>()
         @State private var isFilePickerPresented = false
         @State private var allFiles: [FileReference] = []
-        @State private var searchText = ""
-        @State private var selectedFiles: [FileReference] = []
         @State private var filteredTemplates: [ChatTemplate] = []
         @State private var showingTemplates = false
 
@@ -532,17 +534,29 @@ struct ChatPanelInputArea: View {
                     attachedFilesView
                     
                     if isFilePickerPresented {
-                        filePickerView
-                            .transition(.move(edge: .bottom))
-                            .onAppear() {
-                                allFiles = ContextUtils.getFilesInActiveWorkspace()
+                        FilePicker(
+                            allFiles: $allFiles,
+                            onSubmit: { file in
+                                chat.send(.addSelectedFile(file))
+                            },
+                            onExit: {
+                                isFilePickerPresented = false
+                                focusedField.wrappedValue = .textField
                             }
+                        )
+                        .transition(.move(edge: .bottom))
+                        .onAppear() {
+                            allFiles = ContextUtils.getFilesInActiveWorkspace()
+                        }
                     }
                     
                     HStack(spacing: 0) {
                         Button(action: {
                             withAnimation {
                                 isFilePickerPresented.toggle()
+                                if !isFilePickerPresented {
+                                    focusedField.wrappedValue = .textField
+                                }
                             }
                         }) {
                             Image(systemName: "paperclip")
@@ -571,6 +585,9 @@ struct ChatPanelInputArea: View {
                     if showingTemplates {
                         ChatTemplateDropdownView(templates: $filteredTemplates) { template in
                             chat.typedMessage = "/" + template.id + " "
+                            if template.id == "releaseNotes" {
+                                submitChatMessage()
+                            }
                         }
                     }
                 }
@@ -592,13 +609,15 @@ struct ChatPanelInputArea: View {
                         EmptyView()
                     }
                     .keyboardShortcut(KeyEquivalent.return, modifiers: [.shift])
-
+                    .accessibilityHidden(true)
+                    
                     Button(action: {
                         focusedField.wrappedValue = .textField
                     }) {
                         EmptyView()
                     }
                     .keyboardShortcut("l", modifiers: [.command])
+                    .accessibilityHidden(true)
                 }
             }
         }
@@ -648,92 +667,25 @@ struct ChatPanelInputArea: View {
             }
             .padding(.horizontal, 8)
         }
-        
-        private var filePickerView: some View {
-            VStack(spacing: 8) {
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(.secondary)
-
-                    TextField("Search files...", text: $searchText)
-                        .textFieldStyle(PlainTextFieldStyle())
-                        .foregroundColor(searchText.isEmpty ? Color(nsColor: .placeholderTextColor) : Color(nsColor: .textColor))
-
-                    Button(action: {
-                        withAnimation {
-                            isFilePickerPresented = false
-                        }
-                    }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(HoverButtonStyle())
-                    .help("Close")
-                }
-                .padding(8)
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.gray.opacity(0.1))
-                )
-                .cornerRadius(6)
-                .padding(.horizontal, 4)
-                .padding(.top, 4)
-
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 4) {
-                        ForEach(filteredFiles, id: \.self) { doc in
-                            FileRowView(doc: doc)
-                                .contentShape(Rectangle())
-                                .onTapGesture {
-                                    chat.send(.addSelectedFile(doc))
-                                }
-                        }
-
-                        if filteredFiles.isEmpty {
-                            Text("No results found")
-                                .foregroundColor(.secondary)
-                                .padding(.leading, 4)
-                                .padding(.vertical, 4)
-                        }
-                    }
-                }
-                .frame(maxHeight: 200)
-                .padding(.horizontal, 4)
-                .padding(.bottom, 4)
-            }
-            .fixedSize(horizontal: false, vertical: true)
-            .cornerRadius(6)
-            .shadow(radius: 2)
-//            .background(
-//                RoundedRectangle(cornerRadius: r)
-//                    .fill(.ultraThickMaterial)
-//            )
-            .overlay(
-                RoundedRectangle(cornerRadius: r)
-                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
-            )
-            .padding(.horizontal, 12)
-        }
-        
-        private var filteredFiles: [FileReference] {
-            if searchText.isEmpty {
-                return allFiles
-            }
-            
-            return allFiles.filter { doc in
-                (doc.fileName ?? doc.url.lastPathComponent) .localizedCaseInsensitiveContains(searchText)
-            }
-        }
 
         func chatTemplateCompletion(text: String) async -> [ChatTemplate] {
             guard text.count >= 1 && text.first == "/" else { return [] }
             let prefix = text.dropFirst()
-            let templates = await ChatService.shared.loadChatTemplates() ?? []
-            guard !templates.isEmpty else {
-                return []
+            let promptTemplates = await ChatService.shared.loadChatTemplates() ?? []
+            let releaseNotesTemplate: ChatTemplate = .init(
+                id: "releaseNotes",
+                description: "What's New",
+                shortDescription: "What's New",
+                scopes: [ChatPromptTemplateScope.chatPanel]
+            )
+
+            guard !promptTemplates.isEmpty else {
+                return [releaseNotesTemplate]
             }
 
+            let templates = promptTemplates + [releaseNotesTemplate]
             let skippedTemplates = [ "feedback", "help" ]
+
             return templates.filter { $0.scopes.contains(.chatPanel) &&
                 $0.id.hasPrefix(prefix) && !skippedTemplates.contains($0.id)}
         }
@@ -774,37 +726,6 @@ struct ChatPanelInputArea: View {
         
         func submitChatMessage() {
             chat.send(.sendButtonTapped(UUID().uuidString))
-        }
-    }
-
-    struct FileRowView: View {
-        @State private var isHovered = false
-        let doc: FileReference
-
-        var body: some View {
-            HStack {
-                drawFileIcon(doc.url)
-                    .resizable()
-                    .frame(width: 16, height: 16)
-                    .foregroundColor(.secondary)
-                    .padding(.leading, 4)
-
-                VStack(alignment: .leading) {
-                    Text(doc.fileName ?? doc.url.lastPathComponent)
-                        .font(.body)
-                        .hoverPrimaryForeground(isHovered: isHovered)
-                    Text(doc.relativePath ?? doc.url.path)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                Spacer()
-            }
-            .padding(.vertical, 4)
-            .hoverRadiusBackground(isHovered: isHovered, cornerRadius: 6)
-            .onHover(perform: { hovering in
-                isHovered = hovering
-            })
         }
     }
 }

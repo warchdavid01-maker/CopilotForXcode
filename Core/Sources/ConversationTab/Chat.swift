@@ -56,6 +56,7 @@ struct Chat {
 
         enum Field: String, Hashable {
             case textField
+            case fileSearchBar
         }
     }
 

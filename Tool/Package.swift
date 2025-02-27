@@ -264,6 +264,8 @@ let package = Package(
                 "GitHubCopilotService",
                 "BuiltinExtension",
                 "SystemUtils",
+                "UserDefaultsObserver",
+                "Preferences"
             ]),
 
 

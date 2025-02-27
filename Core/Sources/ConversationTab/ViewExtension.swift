@@ -1,33 +1,30 @@
 import SwiftUI
 
-let BLUE_IN_LIGHT_THEME = Color(red: 98/255, green: 154/255, blue: 248/255)
-let BLUE_IN_DARK_THEME = Color(red: 55/255, green: 108/255, blue: 194/255)
+let ITEM_SELECTED_COLOR = Color("ItemSelectedColor")
 
 struct HoverBackgroundModifier: ViewModifier {
-    @Environment(\.colorScheme) var colorScheme
     var isHovered: Bool
 
     func body(content: Content) -> some View {
         content
-            .background(isHovered ? (colorScheme == .dark ? BLUE_IN_DARK_THEME : BLUE_IN_LIGHT_THEME) : Color.clear)
+            .background(isHovered ? ITEM_SELECTED_COLOR : Color.clear)
     }
 }
 
 struct HoverRadiusBackgroundModifier: ViewModifier {
-    @Environment(\.colorScheme) var colorScheme
     var isHovered: Bool
+    var hoverColor: Color?
     var cornerRadius: CGFloat = 0
 
     func body(content: Content) -> some View {
         content.background(
             RoundedRectangle(cornerRadius: cornerRadius)
-                    .fill(isHovered ? (colorScheme == .dark ? BLUE_IN_DARK_THEME : BLUE_IN_LIGHT_THEME) : Color.clear)
+                    .fill(isHovered ? hoverColor ?? ITEM_SELECTED_COLOR : Color.clear)
             )
     }
 }
 
 struct HoverForegroundModifier: ViewModifier {
-    @Environment(\.colorScheme) var colorScheme
     var isHovered: Bool
     var defaultColor: Color
 
@@ -43,6 +40,10 @@ extension View {
 
     public func hoverRadiusBackground(isHovered: Bool, cornerRadius: CGFloat) -> some View {
         self.modifier(HoverRadiusBackgroundModifier(isHovered: isHovered, cornerRadius: cornerRadius))
+    }
+
+    public func hoverRadiusBackground(isHovered: Bool, hoverColor: Color?, cornerRadius: CGFloat) -> some View {
+        self.modifier(HoverRadiusBackgroundModifier(isHovered: isHovered, hoverColor: hoverColor, cornerRadius: cornerRadius))
     }
 
     public func hoverForeground(isHovered: Bool, defaultColor: Color) -> some View {

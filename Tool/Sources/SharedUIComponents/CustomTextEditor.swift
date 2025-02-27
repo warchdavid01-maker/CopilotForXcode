@@ -88,6 +88,7 @@ public struct CustomTextEditor: NSViewRepresentable {
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
         textView.isAutomaticTextReplacementEnabled = false
+        textView.setAccessibilityLabel("Chat Input, Ask Copilot. Type to ask questions or type / for topics, press enter to send out the request. Use the Chat Accessibility Help command for more information.")
 
         // Configure scroll view
         let scrollView = context.coordinator.theTextView

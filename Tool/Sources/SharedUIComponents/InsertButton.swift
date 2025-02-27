@@ -6,7 +6,7 @@ public struct InsertButton: View {
     @Environment(\.colorScheme) var colorScheme
     
     private var icon: Image {
-        return colorScheme == .dark ? Image("CodeBlockInsertIconDark") : Image("CodeBlockInsertIconLight")
+        return Image("CodeBlockInsertIcon")
     }
     
     public init(insert: @escaping () -> Void) {

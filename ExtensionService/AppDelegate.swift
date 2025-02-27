@@ -33,7 +33,8 @@ class ExtensionUpdateCheckerDelegate: UpdateCheckerDelegate {
 class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     let service = Service.shared
     var statusBarItem: NSStatusItem!
-    var extensionStatusItem: NSMenuItem!
+    var axStatusItem: NSMenuItem!
+    var openCopilotForXcodeItem: NSMenuItem!
     var accountItem: NSMenuItem!
     var authStatusItem: NSMenuItem!
     var upSellItem: NSMenuItem!
@@ -359,19 +360,46 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func updateStatusBarItem() {
         Task { @MainActor in
             let status = await Status.shared.getStatus()
+            /// Update status bar icon
             self.statusBarItem.button?.image = status.icon.nsImage
+            
+            /// Update auth status related status bar items
             switch status.authStatus {
             case .notLoggedIn: configureNotLoggedIn()
             case .loggedIn: configureLoggedIn(status: status)
             case .notAuthorized: configureNotAuthorized(status: status)
             case .unknown: configureUnknown()
             }
+            
+            /// Update accessibility permission status bar item
             if let message = status.message {
-                self.extensionStatusItem.title = message
-                self.extensionStatusItem.isHidden = false
-                self.extensionStatusItem.isEnabled = status.url != nil
+                self.axStatusItem.title = message
+                if let image = NSImage(
+                    systemSymbolName: "exclamationmark.circle.fill",
+                    accessibilityDescription: "Accessibility permission not granted"
+                ) {
+                    image.isTemplate = false
+                    image.withSymbolConfiguration(.init(paletteColors: [.red]))
+                    self.axStatusItem.image = image
+                }
+                self.axStatusItem.isHidden = false
+                self.axStatusItem.isEnabled = status.url != nil
             } else {
-                self.extensionStatusItem.isHidden = true
+                self.axStatusItem.isHidden = true
+            }
+            
+            /// Update settings status bar item
+            if status.extensionStatus == .failed {
+                if let image = NSImage(
+                    systemSymbolName: "exclamationmark.circle.fill",
+                    accessibilityDescription: "Extension permission not granted"
+                ) {
+                    image.isTemplate = false
+                    image.withSymbolConfiguration(.init(paletteColors: [.red]))
+                    self.openCopilotForXcodeItem.image = image
+                }
+            } else {
+                self.openCopilotForXcodeItem.image = nil
             }
             self.markAsProcessing(status.inProgress)
         }

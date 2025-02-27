@@ -60,10 +60,13 @@ public struct ChatTemplateDropdownView: View {
                 switch event.keyCode {
                 case 126: // Up arrow
                     moveSelection(up: true)
+                    return nil
                 case 125: // Down arrow
                     moveSelection(up: false)
+                    return nil
                 case 36: // Return key
                     handleEnter()
+                    return nil
                 case 48: // Tab key
                     handleTab()
                     return nil // not forwarding the Tab Event which will replace the typed message to "\t"

@@ -32,7 +32,7 @@ public struct Instruction: View {
                             .font(.system(size: 14))
                     }
                 }
-            }
+            }.frame(maxWidth: 350)
         }
     }
 }

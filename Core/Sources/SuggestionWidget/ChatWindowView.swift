@@ -20,15 +20,23 @@ struct ChatWindowView: View {
         WithPerceptionTracking {
             let _ = store.currentChatWorkspace?.selectedTabId // force re-evaluation
             ZStack {
-                switch statusObserver.authStatus.status {
-                case .loggedIn:
-                    ChatView(store: store, isChatHistoryVisible: $isChatHistoryVisible)
-                case .notLoggedIn:
-                    ChatLoginView(viewModel: GitHubCopilotViewModel.shared)
-                case .notAuthorized:
-                    ChatNoSubscriptionView(viewModel: GitHubCopilotViewModel.shared)
-                default:
-                    ChatLoadingView()
+                if statusObserver.observedAXStatus == .notGranted {
+                    ChatNoAXPermissionView()
+                } else {
+                    switch statusObserver.authStatus.status {
+                    case .loggedIn:
+                        if isChatHistoryVisible {
+                            ChatHistoryViewWrapper(store: store, isChatHistoryVisible: $isChatHistoryVisible)
+                        } else {
+                            ChatView(store: store, isChatHistoryVisible: $isChatHistoryVisible)
+                        }
+                    case .notLoggedIn:
+                        ChatLoginView(viewModel: GitHubCopilotViewModel.shared)
+                    case .notAuthorized:
+                        ChatNoSubscriptionView(viewModel: GitHubCopilotViewModel.shared)
+                    default:
+                        ChatLoadingView()
+                    }
                 }
             }
             .onChange(of: store.isPanelDisplayed) { isDisplayed in
@@ -64,8 +72,16 @@ struct ChatView: View {
         }
         .xcodeStyleFrame(cornerRadius: 10)
         .ignoresSafeArea(edges: .top)
-        
-        if isChatHistoryVisible {
+    }
+}
+
+struct ChatHistoryViewWrapper: View {
+    let store: StoreOf<ChatPanelFeature>
+    @Binding var isChatHistoryVisible: Bool
+
+    
+    var body: some View {
+        WithPerceptionTracking {
             VStack(spacing: 0) {
                 Rectangle().fill(.regularMaterial).frame(height: 28)
 
@@ -334,10 +350,14 @@ struct ChatBar: View {
                 Button(action: {
                     isChatHistoryVisible = true
                 }) {
-                    Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
+                    Image("HistoryIcon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 24, height: 24)
                 }
-                .buttonStyle(HoverButtonStyle())
+                .buttonStyle(HoverButtonStyle(padding: -2))
                 .help("Show Chats...")
+                .accessibilityLabel("Show Chats...")
             }
         }
     }

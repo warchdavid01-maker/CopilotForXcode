@@ -1,40 +1,23 @@
 import AppKit
 import Foundation
 
-public enum ExtensionPermissionStatus {
-    case unknown
-    case succeeded
-    case failed
-}
+public enum ExtensionPermissionStatus { case unknown, succeeded, failed }
 
 @objc public enum ObservedAXStatus: Int {
-    case unknown = -1
-    case granted = 1
-    case notGranted = 0
+    case unknown = -1, granted = 1, notGranted = 0
 }
 
 public struct CLSStatus: Equatable {
-    public enum Status {
-            case unknown, normal, inProgress, error, warning, inactive
-        }
-
+    public enum Status { case unknown, normal, inProgress, error, warning, inactive }
     public let status: Status
     public let message: String
-
-    public var isInactiveStatus: Bool {
-        status == .inactive && !message.isEmpty
-    }
-
-    public var isErrorStatus: Bool {
-        (status == .warning || status == .error) && !message.isEmpty
-    }
+    
+    public var isInactiveStatus: Bool { status == .inactive && !message.isEmpty }
+    public var isErrorStatus: Bool { (status == .warning || status == .error) && !message.isEmpty }
 }
 
 public struct AuthStatus: Equatable {
-    public enum Status {
-            case unknown, loggedIn, notLoggedIn, notAuthorized
-        }
-
+    public enum Status { case unknown, loggedIn, notLoggedIn, notAuthorized }
     public let status: Status
     public let username: String?
     public let message: String?
@@ -51,7 +34,7 @@ private struct CLSStatusInfo {
     let message: String
 }
 
-private struct ExtensionStatusInfo {
+private struct AccessibilityStatusInfo {
     let icon: StatusResponse.Icon?
     let message: String?
     let url: String?
@@ -64,28 +47,33 @@ public extension Notification.Name {
 
 public struct StatusResponse {
     public struct Icon {
+        /// Name of the icon resource
         public let name: String
-        // isTemplate = true, monochrome icon; isTemplate = false, colored icon
-        public let isTemplate: Bool
 
-        public init(name: String, isTemplate: Bool = true) {
+        public init(name: String) {
             self.name = name
-            self.isTemplate = isTemplate
         }
 
         public var nsImage: NSImage? {
-            let image = NSImage(named: name)
-            image?.isTemplate = isTemplate
-            return image
+            return NSImage(named: name)
         }
     }
 
+    /// The icon to display in the menu bar
     public let icon: Icon
+    /// Indicates if an operation is in progress
     public let inProgress: Bool
+    /// Message from the CLS (Copilot Language Server) status
     public let clsMessage: String
+    /// Additional message (for accessibility or extension status)
     public let message: String?
+    /// Extension status
+    public let extensionStatus: ExtensionPermissionStatus
+    /// URL for system preferences or other actions
     public let url: String?
+    /// Current authentication status
     public let authStatus: AuthStatus.Status
+    /// GitHub username of the authenticated user
     public let userName: String?
 }
 
@@ -97,7 +85,7 @@ public final actor Status {
     private var clsStatus = CLSStatus(status: .unknown, message: "")
     private var authStatus = AuthStatus(status: .unknown, username: nil, message: nil)
 
-    private let okIcon = StatusResponse.Icon(name: "MenuBarIcon", isTemplate: false)
+    private let okIcon = StatusResponse.Icon(name: "MenuBarIcon")
     private let errorIcon = StatusResponse.Icon(name: "MenuBarWarningIcon")
     private let inactiveIcon = StatusResponse.Icon(name: "MenuBarInactiveIcon")
 
@@ -128,6 +116,10 @@ public final actor Status {
         authStatus = newStatus
         broadcast()
     }
+    
+    public func getExtensionStatus() -> ExtensionPermissionStatus {
+        extensionStatus
+    }
 
     public func getAXStatus() -> ObservedAXStatus {
         if isXcodeRunning() {
@@ -156,13 +148,17 @@ public final actor Status {
     public func getStatus() -> StatusResponse {
         let authStatusInfo: AuthStatusInfo = getAuthStatusInfo()
         let clsStatusInfo: CLSStatusInfo = getCLSStatusInfo()
-        let extensionStatusInfo: ExtensionStatusInfo = getExtensionStatusInfo()
+        let extensionStatusIcon = (
+            extensionStatus == ExtensionPermissionStatus.failed
+        ) ? errorIcon : nil
+        let accessibilityStatusInfo: AccessibilityStatusInfo = getAccessibilityStatusInfo()
         return .init(
-            icon: authStatusInfo.authIcon ?? clsStatusInfo.icon ?? extensionStatusInfo.icon ?? okIcon,
+            icon: authStatusInfo.authIcon ?? clsStatusInfo.icon ?? extensionStatusIcon ?? accessibilityStatusInfo.icon ?? okIcon,
             inProgress: clsStatus.status == .inProgress,
             clsMessage: clsStatus.message,
-            message: extensionStatusInfo.message,
-            url: extensionStatusInfo.url,
+            message: accessibilityStatusInfo.message,
+            extensionStatus: extensionStatus,
+            url: accessibilityStatusInfo.url,
             authStatus: authStatusInfo.authStatus,
             userName: authStatusInfo.userName
         )
@@ -201,22 +197,12 @@ public final actor Status {
         return CLSStatusInfo(icon: nil, message: "")
     }
 
-    private func getExtensionStatusInfo() -> ExtensionStatusInfo {
-        if extensionStatus == .failed {
-            return ExtensionStatusInfo(
-                icon: errorIcon,
-                message: """
-                Enable Copilot in Xcode & restart
-                """,
-                url: "x-apple.systempreferences:com.apple.ExtensionsPreferences"
-            )
-        }
-
+    private func getAccessibilityStatusInfo() -> AccessibilityStatusInfo {
         switch getAXStatus() {
         case .granted:
-            return ExtensionStatusInfo(icon: nil, message: nil, url: nil)
+            return AccessibilityStatusInfo(icon: nil, message: nil, url: nil)
         case .notGranted:
-            return ExtensionStatusInfo(
+            return AccessibilityStatusInfo(
                 icon: errorIcon,
                 message: """
                 Enable accessibility in system preferences
@@ -224,7 +210,7 @@ public final actor Status {
                 url: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
             )
         case .unknown:
-            return ExtensionStatusInfo(
+            return AccessibilityStatusInfo(
                 icon: errorIcon,
                 message: """
                 Enable accessibility or restart Copilot

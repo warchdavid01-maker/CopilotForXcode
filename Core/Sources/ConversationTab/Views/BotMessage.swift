@@ -86,6 +86,7 @@ struct BotMessage: View {
                     .foregroundStyle(.secondary)
                 })
                 .buttonStyle(HoverButtonStyle())
+                .accessibilityValue(isReferencesPresented ? "Collapse" : "Expand")
                 
                 if isReferencesPresented {
                     ReferenceList(references: references, chat: chat)

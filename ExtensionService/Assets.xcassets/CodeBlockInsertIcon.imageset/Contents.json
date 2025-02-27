@@ -1,7 +1,7 @@
 {
   "images" : [
     {
-      "filename" : "Status=active, Mode=dark.svg",
+      "filename" : "light1x.svg",
       "idiom" : "universal"
     },
     {
@@ -11,7 +11,7 @@
           "value" : "dark"
         }
       ],
-      "filename" : "Status=active, Mode=white.svg",
+      "filename" : "dark1x.svg",
       "idiom" : "universal"
     }
   ],
