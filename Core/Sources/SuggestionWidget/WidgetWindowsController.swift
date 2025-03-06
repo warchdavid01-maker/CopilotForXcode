@@ -732,6 +732,8 @@ public final class WidgetWindows {
     }()
 
     @MainActor
+    // The toast window area is now capturing mouse events
+    // Even in the transparent parts where there's no visible content.
     lazy var toastWindow = {
         let it = CanBecomeKeyWindow(
             contentRect: .zero,
@@ -740,7 +742,7 @@ public final class WidgetWindows {
             defer: false
         )
         it.isReleasedWhenClosed = false
-        it.isOpaque = true
+        it.isOpaque = false
         it.backgroundColor = .clear
         it.level = widgetLevel(0)
         it.collectionBehavior = [.fullScreenAuxiliary, .transient, .canJoinAllSpaces]
@@ -752,7 +754,6 @@ public final class WidgetWindows {
             ))
         )
         it.setIsVisible(true)
-        it.ignoresMouseEvents = true
         it.canBecomeKeyChecker = { false }
         return it
     }()

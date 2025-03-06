@@ -120,8 +120,7 @@ struct BotMessage: View {
                 if errorMessage != nil {
                     HStack(spacing: 4) {
                         Image(systemName: "info.circle")
-                        Text(errorMessage!)
-                            .font(.system(size: chatFontSize))
+                        ThemedMarkdownText(text: errorMessage!, chat: chat)
                     }
                 }
 

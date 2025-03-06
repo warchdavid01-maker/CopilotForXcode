@@ -34,6 +34,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     let service = Service.shared
     var statusBarItem: NSStatusItem!
     var axStatusItem: NSMenuItem!
+    var extensionStatusItem: NSMenuItem!
     var openCopilotForXcodeItem: NSMenuItem!
     var accountItem: NSMenuItem!
     var authStatusItem: NSMenuItem!
@@ -268,7 +269,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         self.upSellItem.isHidden = true
         self.toggleCompletions.isHidden = true
         self.toggleIgnoreLanguage.isHidden = true
-        self.openChat.isHidden = true
         self.signOutItem.isHidden = true
     }
 
@@ -310,7 +310,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         self.toggleCompletions.isHidden = false
         self.toggleIgnoreLanguage.isHidden = false
-        self.openChat.isHidden = false
         self.signOutItem.isHidden = false
     }
 
@@ -339,7 +338,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         self.upSellItem.isEnabled = true
         self.toggleCompletions.isHidden = true
         self.toggleIgnoreLanguage.isHidden = true
-        self.openChat.isHidden = true
         self.signOutItem.isHidden = false
     }
 
@@ -353,7 +351,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         self.upSellItem.isHidden = true
         self.toggleCompletions.isHidden = false
         self.toggleIgnoreLanguage.isHidden = false
-        self.openChat.isHidden = false
         self.signOutItem.isHidden = false
     }
 
@@ -372,14 +369,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             
             /// Update accessibility permission status bar item
+            let exclamationmarkImage = NSImage(
+                systemSymbolName: "exclamationmark.circle.fill",
+                accessibilityDescription: "Permission not granted"
+            )
+            exclamationmarkImage?.isTemplate = false
+            exclamationmarkImage?.withSymbolConfiguration(.init(paletteColors: [.red]))
+            
             if let message = status.message {
                 self.axStatusItem.title = message
-                if let image = NSImage(
-                    systemSymbolName: "exclamationmark.circle.fill",
-                    accessibilityDescription: "Accessibility permission not granted"
-                ) {
-                    image.isTemplate = false
-                    image.withSymbolConfiguration(.init(paletteColors: [.red]))
+                if let image = exclamationmarkImage {
                     self.axStatusItem.image = image
                 }
                 self.axStatusItem.isHidden = false
@@ -389,17 +388,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             
             /// Update settings status bar item
-            if status.extensionStatus == .failed {
-                if let image = NSImage(
-                    systemSymbolName: "exclamationmark.circle.fill",
-                    accessibilityDescription: "Extension permission not granted"
-                ) {
-                    image.isTemplate = false
-                    image.withSymbolConfiguration(.init(paletteColors: [.red]))
-                    self.openCopilotForXcodeItem.image = image
+            if status.extensionStatus == .disabled || status.extensionStatus == .notGranted {
+                if let image = exclamationmarkImage{
+                    if #available(macOS 15.0, *){
+                        self.extensionStatusItem.image = image
+                        self.extensionStatusItem.title = status.extensionStatus == .notGranted ? "Enable extension for full-featured completion" : "Quit and restart Xcode to enable extension"
+                        self.extensionStatusItem.isHidden = false
+                        self.extensionStatusItem.isEnabled = status.extensionStatus == .notGranted
+                    } else {
+                        self.extensionStatusItem.isHidden = true
+                        self.openCopilotForXcodeItem.image = image
+                    }
                 }
             } else {
                 self.openCopilotForXcodeItem.image = nil
+                self.extensionStatusItem.isHidden = true
             }
             self.markAsProcessing(status.inProgress)
         }

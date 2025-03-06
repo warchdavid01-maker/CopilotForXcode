@@ -43,7 +43,7 @@ public extension Workspace {
     ) async throws -> [CodeSuggestion] {
         refreshUpdateTime()
 
-        let filespace = createFilespaceIfNeeded(fileURL: fileURL)
+        let filespace = try createFilespaceIfNeeded(fileURL: fileURL)
 
         if !editor.uti.isEmpty {
             filespace.codeMetadata.uti = editor.uti

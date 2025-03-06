@@ -191,7 +191,8 @@ let package = Package(
                     .product(name: "Cache", package: "Tool"),
                     .product(name: "MarkdownUI", package: "swift-markdown-ui"),
                     .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
-                    .product(name: "SwiftUIFlowLayout", package: "swiftui-flow-layout")
+                    .product(name: "SwiftUIFlowLayout", package: "swiftui-flow-layout"),
+                    .product(name: "Persist", package: "Tool")
                 ]
             ),
             .testTarget(

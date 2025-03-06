@@ -35,6 +35,7 @@ struct ConversationCreateParams: Codable {
     var source: ConversationSource?
     var workspaceFolder: String?
     var ignoredSkills: [String]?
+    var model: String?
 
     struct Capabilities: Codable {
         var skills: [String]
@@ -134,6 +135,7 @@ struct TurnCreateParams: Codable {
     var doc: Doc?
     var ignoredSkills: [String]?
     var references: [Reference]?
+    var model: String?
 }
 
 // MARK: Copy
@@ -158,25 +160,3 @@ public struct ConversationContextParams: Codable {
 }
 
 public typealias ConversationContextRequest = JSONRPCRequest<ConversationContextParams>
-
-// MARK: Conversation template
-
-public struct Template: Codable {
-    public var id: String
-    public var description: String
-    public var shortDescription: String
-    public var scopes: [PromptTemplateScope]
-    
-    public init(id: String, description: String, shortDescription: String, scopes: [PromptTemplateScope]) {
-        self.id = id
-        self.description = description
-        self.shortDescription = shortDescription
-        self.scopes = scopes
-    }
-}
-
-public enum PromptTemplateScope: String, Codable {
-    case chatPanel = "chat-panel"
-    case editor = "editor"
-    case inline = "inline"
-}

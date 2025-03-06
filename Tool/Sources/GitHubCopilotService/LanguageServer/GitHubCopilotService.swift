@@ -57,17 +57,20 @@ public protocol GitHubCopilotConversationServiceType {
                             doc: Doc?,
                             skills: [String],
                             ignoredSkills: [String]?,
-                            references: [FileReference]) async throws
+                            references: [FileReference],
+                            model: String?) async throws
     func createTurn(_ message: String,
                     workDoneToken: String,
                     conversationId: String,
                     doc: Doc?,
                     ignoredSkills: [String]?,
-                    references: [FileReference]) async throws
+                    references: [FileReference],
+                    model: String?) async throws
     func rateConversation(turnId: String, rating: ConversationRating) async throws
     func copyCode(turnId: String, codeBlockIndex: Int, copyType: CopyKind, copiedCharacters: Int, totalCharacters: Int, copiedText: String) async throws
     func cancelProgress(token: String) async
-    func templates() async throws -> [Template]
+    func templates() async throws -> [ChatTemplate]
+    func models() async throws -> [CopilotModel]
 }
 
 protocol GitHubCopilotLSP {
@@ -389,8 +392,13 @@ public final class GitHubCopilotService:
                     // sometimes the content inside language server is not new enough, which can
                     // lead to an version mismatch error. We can try a few times until the content
                     // is up to date.
-                    if maxTry <= 0 { break }
-                    Logger.gitHubCopilot.error(
+                    if maxTry <= 0 {
+                        Logger.gitHubCopilot.error(
+                            "Max retry for getting suggestions reached: \(GitHubCopilotError.languageServerError(error).localizedDescription)"
+                        )
+                        break
+                    }
+                    Logger.gitHubCopilot.info(
                         "Try getting suggestions again: \(GitHubCopilotError.languageServerError(error).localizedDescription)"
                     )
                     try await Task.sleep(nanoseconds: 200_000_000)
@@ -450,7 +458,8 @@ public final class GitHubCopilotService:
                                    doc: Doc?,
                                    skills: [String],
                                    ignoredSkills: [String]?,
-                                   references: [FileReference] ) async throws {
+                                   references: [FileReference],
+                                   model: String?) async throws {
         let params = ConversationCreateParams(workDoneToken: workDoneToken,
                                               turns: [ConversationTurn(request: message)],
                                               capabilities: ConversationCreateParams.Capabilities(
@@ -467,7 +476,8 @@ public final class GitHubCopilotService:
                                                 },
                                               source: .panel,
                                               workspaceFolder: workspaceFolder,
-                                              ignoredSkills: ignoredSkills)
+                                              ignoredSkills: ignoredSkills,
+                                              model: model)
         do {
             _ = try await sendRequest(
                 GitHubCopilotRequest.CreateConversation(params: params)
@@ -479,7 +489,7 @@ public final class GitHubCopilotService:
     }
 
     @GitHubCopilotSuggestionActor
-    public func createTurn(_ message: String, workDoneToken: String, conversationId: String, doc: Doc?, ignoredSkills: [String]?, references: [FileReference]) async throws {
+    public func createTurn(_ message: String, workDoneToken: String, conversationId: String, doc: Doc?, ignoredSkills: [String]?, references: [FileReference], model: String?) async throws {
         do {
             let params = TurnCreateParams(workDoneToken: workDoneToken,
                                           conversationId: conversationId,
@@ -493,7 +503,8 @@ public final class GitHubCopilotService:
                                                     selection: nil,
                                                     openedAt: nil,
                                                     activeAt: nil)
-                                        })
+                                          },
+                                          model: model)
                                               
             _ = try await sendRequest(
                 GitHubCopilotRequest.CreateTurn(params: params)
@@ -505,10 +516,22 @@ public final class GitHubCopilotService:
     }
 
     @GitHubCopilotSuggestionActor
-    public func templates() async throws -> [Template] {
+    public func templates() async throws -> [ChatTemplate] {
         do {
             let response = try await sendRequest(
                 GitHubCopilotRequest.GetTemplates()
+            )
+            return response
+        } catch {
+            throw error
+        }
+    }
+
+    @GitHubCopilotSuggestionActor
+    public func models() async throws -> [CopilotModel] {
+        do {
+            let response = try await sendRequest(
+                GitHubCopilotRequest.CopilotModels()
             )
             return response
         } catch {

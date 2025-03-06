@@ -107,7 +107,7 @@ public final class Service {
             
             await XcodeInspector.shared.safe.$activeWorkspaceURL.receive(on: DispatchQueue.main)
                 .sink { newURL in
-                    if let path = newURL?.path, self.guiController.store.chatHistory.selectedWorkspacePath != path {
+                    if let path = newURL?.path, path != "/", self.guiController.store.chatHistory.selectedWorkspacePath != path {
                         let name = self.getDisplayNameOfXcodeWorkspace(url: newURL!)
                         self.guiController.store.send(.switchWorkspace(path: path, name: name))
                     }

@@ -1,7 +1,9 @@
 import AppKit
 import Foundation
 
-public enum ExtensionPermissionStatus { case unknown, succeeded, failed }
+@objc public enum ExtensionPermissionStatus: Int {
+    case unknown = -1, notGranted = 0, disabled = 1, granted = 2
+}
 
 @objc public enum ObservedAXStatus: Int {
     case unknown = -1, granted = 1, notGranted = 0
@@ -77,6 +79,7 @@ public struct StatusResponse {
     public let userName: String?
 }
 
+private var currentUserName: String? = nil
 public final actor Status {
     public static let shared = Status()
 
@@ -90,6 +93,10 @@ public final actor Status {
     private let inactiveIcon = StatusResponse.Icon(name: "MenuBarInactiveIcon")
 
     private init() {}
+
+    public static func currentUser() -> String? {
+        return currentUserName
+    }
 
     public func updateExtensionStatus(_ status: ExtensionPermissionStatus) {
         guard status != extensionStatus else { return }
@@ -111,6 +118,7 @@ public final actor Status {
     }
 
     public func updateAuthStatus(_ status: AuthStatus.Status, username: String? = nil, message: String? = nil) {
+        currentUserName = username
         let newStatus = AuthStatus(status: status, username: username, message: message)
         guard newStatus != authStatus else { return }
         authStatus = newStatus
@@ -149,7 +157,7 @@ public final actor Status {
         let authStatusInfo: AuthStatusInfo = getAuthStatusInfo()
         let clsStatusInfo: CLSStatusInfo = getCLSStatusInfo()
         let extensionStatusIcon = (
-            extensionStatus == ExtensionPermissionStatus.failed
+            extensionStatus == ExtensionPermissionStatus.disabled || extensionStatus == ExtensionPermissionStatus.notGranted
         ) ? errorIcon : nil
         let accessibilityStatusInfo: AccessibilityStatusInfo = getAccessibilityStatusInfo()
         return .init(

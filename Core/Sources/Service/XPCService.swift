@@ -22,6 +22,14 @@ public class XPCService: NSObject, XPCServiceProtocol {
             reply(await Status.shared.getAXStatus())
         }
     }
+    
+    public func getXPCServiceExtensionPermission(
+        withReply reply: @escaping (ExtensionPermissionStatus) -> Void
+    ) {
+        Task {
+            reply(await Status.shared.getExtensionStatus())
+        }
+    }
 
     // MARK: - Suggestion
 

@@ -19,6 +19,7 @@ let package = Package(
         .library(name: "Toast", targets: ["Toast"]),
         .library(name: "SharedUIComponents", targets: ["SharedUIComponents"]),
         .library(name: "Status", targets: ["Status"]),
+        .library(name: "Persist", targets: ["Persist"]),
         .library(name: "UserDefaultsObserver", targets: ["UserDefaultsObserver"]),
         .library(name: "Workspace", targets: ["Workspace", "WorkspaceSuggestionService"]),
         .library(
@@ -238,6 +239,14 @@ let package = Package(
         .target(
             name: "Status",
             dependencies: ["Cache"]
+        ),
+
+        .target(
+            name: "Persist",
+            dependencies: [
+                "Logger",
+                "Status"
+            ]
         ),
 
         .target(name: "SuggestionProvider", dependencies: [

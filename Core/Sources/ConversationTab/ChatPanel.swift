@@ -31,7 +31,7 @@ public struct ChatPanel: View {
                 } else {
                     ChatPanelMessages(chat: chat)
                         .accessibilityElement(children: .combine)
-                        .accessibilityLabel("Chat Mesessages Group")
+                        .accessibilityLabel("Chat Messages Group")
                     
                     if chat.history.last?.role == .system {
                         ChatCLSError(chat: chat).padding(.trailing, 16)
@@ -567,6 +567,7 @@ struct ChatPanelInputArea: View {
 
                         Spacer()
 
+                        ModelPicker()
                         Button(action: {
                             submitChatMessage()
                         }) {
@@ -676,7 +677,7 @@ struct ChatPanelInputArea: View {
                 id: "releaseNotes",
                 description: "What's New",
                 shortDescription: "What's New",
-                scopes: [ChatPromptTemplateScope.chatPanel]
+                scopes: [PromptTemplateScope.chatPanel]
             )
 
             guard !promptTemplates.isEmpty else {

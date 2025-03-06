@@ -4,7 +4,7 @@ import ConversationServiceProvider
 import BuiltinExtension
 
 public final class GitHubCopilotConversationService: ConversationServiceType {
-    
+
     private let serviceLocator: ServiceLocator
     
     init(serviceLocator: ServiceLocator) {
@@ -20,7 +20,8 @@ public final class GitHubCopilotConversationService: ConversationServiceType {
                                                     doc: nil,
                                                     skills: request.skills,
                                                     ignoredSkills: request.ignoredSkills,
-                                                    references: request.references ?? [])
+                                                    references: request.references ?? [],
+                                                    model: request.model)
     }
     
     public func createTurn(with conversationId: String, request: ConversationRequest, workspace: WorkspaceInfo) async throws {
@@ -31,7 +32,8 @@ public final class GitHubCopilotConversationService: ConversationServiceType {
                                             conversationId: conversationId,
                                             doc: nil,
                                             ignoredSkills: request.ignoredSkills,
-                                            references: request.references ?? [])
+                                            references: request.references ?? [],
+                                            model: request.model)
     }
     
     public func cancelProgress(_ workDoneToken: String, workspace: WorkspaceInfo) async throws {
@@ -52,22 +54,11 @@ public final class GitHubCopilotConversationService: ConversationServiceType {
 
     public func templates(workspace: WorkspaceInfo) async throws -> [ChatTemplate]? {
         guard let service = await serviceLocator.getService(from: workspace) else { return nil }
-        return try await service.templates().map { convertTemplateToChatTemplate($0) }
+        return try await service.templates()
     }
 
-    func convertTemplateToChatTemplate(_ template: Template) -> ChatTemplate {
-        ChatTemplate(
-            id: template.id,
-            description: template.description,
-            shortDescription: template.shortDescription,
-            scopes: template.scopes.map { scope in
-                switch scope {
-                case .chatPanel: return .chatPanel
-                case .editor: return .editor
-                case .inline: return .inline
-                }
-            }
-        )
+    public func models(workspace: WorkspaceInfo) async throws -> [CopilotModel]? {
+        guard let service = await serviceLocator.getService(from: workspace) else { return nil }
+        return try await service.models()
     }
 }
-

@@ -10,7 +10,7 @@ import Status
 
 public protocol ChatServiceType {
     var memory: ContextAwareAutoManagedChatMemory { get set }
-    func send(_ id: String, content: String, skillSet: [ConversationSkill], references: [FileReference]) async throws
+    func send(_ id: String, content: String, skillSet: [ConversationSkill], references: [FileReference], model: String?) async throws
     func stopReceivingMessage() async
     func upvote(_ id: String, _ rating: ConversationRating) async
     func downvote(_ id: String, _ rating: ConversationRating) async
@@ -82,7 +82,7 @@ public final class ChatService: ChatServiceType, ObservableObject {
         return ChatService(provider: provider)
     }
     
-    public func send(_ id: String, content: String, skillSet: Array<ConversationSkill>, references: Array<FileReference>) async throws {
+    public func send(_ id: String, content: String, skillSet: Array<ConversationSkill>, references: Array<FileReference>, model: String? = nil) async throws {
         guard activeRequestId == nil else { return }
         let workDoneToken = UUID().uuidString
         activeRequestId = workDoneToken
@@ -115,7 +115,8 @@ public final class ChatService: ChatServiceType, ObservableObject {
                                           workspaceFolder: "",
                                           skills: skillCapabilities,
                                           ignoredSkills: ignoredSkills,
-                                          references: references)
+                                          references: references,
+                                          model: model)
         self.skillSet = skillSet
         try await send(request)
     }
@@ -258,6 +259,11 @@ public final class ChatService: ChatServiceType, ObservableObject {
         return nil
     }
 
+    public func copilotModels() async -> [CopilotModel] {
+        guard let models = try? await conversationProvider?.models() else { return [] }
+        return models
+    }
+
     public func handleSingleRoundDialogCommand(
         systemPrompt: String?,
         overwriteSystemPrompt: Bool,
@@ -332,6 +338,16 @@ public final class ChatService: ChatServiceType, ObservableObject {
                         content: CLSError.message
                     )
                     await memory.removeMessage(progress.turnId)
+                    await memory.appendMessage(errorMessage)
+                }
+            } else if CLSError.code == 400 && CLSError.message.contains("model is not supported") {
+                Task {
+                    let errorMessage = ChatMessage(
+                        id: progress.turnId,
+                        role: .assistant,
+                        content: "",
+                        errorMessage: "Oops, the model is not supported. Please enable it first in [GitHub Copilot settings](https://github.com/settings/copilot)."
+                    )
                     await memory.appendMessage(errorMessage)
                 }
             } else {

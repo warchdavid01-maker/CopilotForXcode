@@ -9,6 +9,7 @@ public protocol ConversationServiceType {
     func rateConversation(turnId: String, rating: ConversationRating, workspace: WorkspaceInfo) async throws
     func copyCode(request: CopyCodeRequest, workspace: WorkspaceInfo) async throws
     func templates(workspace: WorkspaceInfo) async throws -> [ChatTemplate]?
+    func models(workspace: WorkspaceInfo) async throws -> [CopilotModel]?
 }
 
 public protocol ConversationServiceProvider {
@@ -18,6 +19,7 @@ public protocol ConversationServiceProvider {
     func rateConversation(turnId: String, rating: ConversationRating) async throws
     func copyCode(_ request: CopyCodeRequest) async throws
     func templates() async throws -> [ChatTemplate]?
+    func models() async throws -> [CopilotModel]?
 }
 
 public struct FileReference: Hashable {
@@ -71,6 +73,7 @@ public struct ConversationRequest {
     public var skills: [String]
     public var ignoredSkills: [String]?
     public var references: [FileReference]?
+    public var model: String?
 
     public init(
         workDoneToken: String,
@@ -78,7 +81,8 @@ public struct ConversationRequest {
         workspaceFolder: String,
         skills: [String],
         ignoredSkills: [String]? = nil,
-        references: [FileReference]? = nil
+        references: [FileReference]? = nil,
+        model: String? = nil
     ) {
         self.workDoneToken = workDoneToken
         self.content = content
@@ -86,6 +90,7 @@ public struct ConversationRequest {
         self.skills = skills
         self.ignoredSkills = ignoredSkills
         self.references = references
+        self.model = model
     }
 }
 
@@ -200,31 +205,4 @@ public struct ConversationFollowUp: Codable, Equatable {
         self.id = id
         self.type = type
     }
-}
-
-public struct ChatTemplate: Codable, Equatable {
-    public var id: String
-    public var description: String
-    public var shortDescription: String
-    public var scopes: [ChatPromptTemplateScope]
-    
-    public init(id: String, description: String, shortDescription: String, scopes: [ChatPromptTemplateScope]=[]) {
-        self.id = id
-        self.description = description
-        self.shortDescription = shortDescription
-        self.scopes = scopes
-    }
-}
-
-public enum ChatPromptTemplateScope: String, Codable, Equatable {
-    case chatPanel = "chat-panel"
-    case editor = "editor"
-    case inline = "inline"
-}
-
-public struct CopilotLanguageServerError: Codable {
-    public var code: Int?
-    public var message: String
-    public var responseIsIncomplete: Bool?
-    public var responseIsFiltered: Bool?
 }

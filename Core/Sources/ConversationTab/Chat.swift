@@ -5,6 +5,7 @@ import ChatAPIService
 import Preferences
 import Terminal
 import ConversationServiceProvider
+import Persist
 
 public struct DisplayedChatMessage: Equatable {
     public enum Role: Equatable {
@@ -140,9 +141,9 @@ struct Chat {
                 state.typedMessage = ""
                 
                 let selectedFiles = state.selectedFiles
-                
+                let selectedModelFamily = AppState.shared.getSelectedModelFamily()
                 return .run { _ in
-                    try await service.send(id, content: message, skillSet: skillSet, references: selectedFiles)
+                    try await service.send(id, content: message, skillSet: skillSet, references: selectedFiles, model: selectedModelFamily)
                 }.cancellable(id: CancelID.sendMessage(self.id))
                 
             case let .followUpButtonClicked(id, message):
@@ -150,9 +151,10 @@ struct Chat {
                 let skillSet = state.buildSkillSet()
                 
                 let selectedFiles = state.selectedFiles
+                let selectedModelFamily = AppState.shared.getSelectedModelFamily()
                 
                 return .run { _ in
-                    try await service.send(id, content: message, skillSet: skillSet, references: selectedFiles)
+                    try await service.send(id, content: message, skillSet: skillSet, references: selectedFiles, model: selectedModelFamily)
                 }.cancellable(id: CancelID.sendMessage(self.id))
 
             case .returnButtonTapped:

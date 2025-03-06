@@ -3,6 +3,7 @@ import JSONRPC
 import LanguageServerProtocol
 import Status
 import SuggestionBasic
+import ConversationServiceProvider
 
 struct GitHubCopilotDoc: Codable {
     var source: String
@@ -341,10 +342,18 @@ enum GitHubCopilotRequest {
     // MARK: Conversation templates
 
     struct GetTemplates: GitHubCopilotRequestType {
-        typealias Response = Array<Template>
+        typealias Response = Array<ChatTemplate>
 
         var request: ClientRequest {
             .custom("conversation/templates", .hash([:]))
+        }
+    }
+
+    struct CopilotModels: GitHubCopilotRequestType {
+        typealias Response = Array<CopilotModel>
+
+        var request: ClientRequest {
+            .custom("copilot/models", .hash([:]))
         }
     }
 

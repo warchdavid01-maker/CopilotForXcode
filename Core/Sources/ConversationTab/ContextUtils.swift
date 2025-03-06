@@ -3,7 +3,7 @@ import XcodeInspector
 import Foundation
 import Logger
 
-public let supportedFileExtensions: Set<String> = ["swift", "m", "mm", "h", "cpp", "c", "js", "py", "rb", "java", "applescript", "scpt", "plist", "entitlements"]
+public let supportedFileExtensions: Set<String> = ["swift", "m", "mm", "h", "cpp", "c", "js", "py", "rb", "java", "applescript", "scpt", "plist", "entitlements", "md", "json", "xml", "txt", "yaml", "yml"]
 private let skipPatterns: [String] = [
     ".git",
     ".svn",

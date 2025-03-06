@@ -13,6 +13,7 @@ struct General {
     struct State: Equatable {
         var xpcServiceVersion: String?
         var isAccessibilityPermissionGranted: ObservedAXStatus = .unknown
+        var isExtensionPermissionGranted: ExtensionPermissionStatus = .unknown
         var isReloading = false
     }
 
@@ -21,7 +22,11 @@ struct General {
         case setupLaunchAgentIfNeeded
         case openExtensionManager
         case reloadStatus
-        case finishReloading(xpcServiceVersion: String, permissionGranted: ObservedAXStatus)
+        case finishReloading(
+            xpcServiceVersion: String,
+            axStatus: ObservedAXStatus,
+            extensionStatus: ExtensionPermissionStatus
+        )
         case failedReloading
         case retryReloading
     }
@@ -84,9 +89,11 @@ struct General {
                             let xpcServiceVersion = try await service.getXPCServiceVersion().version
                             let isAccessibilityPermissionGranted = try await service
                                 .getXPCServiceAccessibilityPermission()
+                            let isExtensionPermissionGranted = try await service.getXPCServiceExtensionPermission()
                             await send(.finishReloading(
                                 xpcServiceVersion: xpcServiceVersion,
-                                permissionGranted: isAccessibilityPermissionGranted
+                                axStatus: isAccessibilityPermissionGranted,
+                                extensionStatus: isExtensionPermissionGranted
                             ))
                         } else {
                             toast("Launching service app.", .info)
@@ -107,9 +114,10 @@ struct General {
                     }
                 }.cancellable(id: ReloadStatusCancellableId(), cancelInFlight: true)
 
-            case let .finishReloading(version, granted):
+            case let .finishReloading(version, axStatus, extensionStatus):
                 state.xpcServiceVersion = version
-                state.isAccessibilityPermissionGranted = granted
+                state.isAccessibilityPermissionGranted = axStatus
+                state.isExtensionPermissionGranted = extensionStatus
                 state.isReloading = false
                 return .none
 
