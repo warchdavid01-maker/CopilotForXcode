@@ -479,7 +479,7 @@ func getCLSMessageSummary(_ message: String) -> CLSMessage {
     let summary: String
     if message.contains("You've reached your monthly chat messages limit") {
         summary = "Monthly Chat Limit Reached"
-    } else if message.contains("You've reached your monthly code completion limit") {
+    } else if message.contains("Completions limit reached") {
         summary = "Monthly Completion Limit Reached"
     } else {
         summary = "CLS Error"

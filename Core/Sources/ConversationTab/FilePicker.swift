@@ -81,6 +81,7 @@ public struct FilePicker: View {
                                     .padding(.vertical, 4)
                             }
                         }
+                        .id(filteredFiles.hashValue)
                     }
                     .frame(maxHeight: 200)
                     .padding(.horizontal, 4)

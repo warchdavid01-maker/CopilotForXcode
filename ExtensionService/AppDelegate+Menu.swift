@@ -134,6 +134,7 @@ extension AppDelegate {
         )
 
         statusBarMenu.addItem(accountItem)
+        statusBarMenu.addItem(.separator())
         statusBarMenu.addItem(authStatusItem)
         statusBarMenu.addItem(upSellItem)
         statusBarMenu.addItem(.separator())
