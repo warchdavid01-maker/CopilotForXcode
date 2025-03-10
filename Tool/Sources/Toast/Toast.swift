@@ -271,15 +271,20 @@ public extension NSWorkspace {
             }
             NSWorkspace.shared.open(URL(string: urlString)!)
         } else {
-            let script = NSAppleScript(
-                source: """
-                tell application "System Preferences"
-                    activate
-                    set the current pane to pane id "com.apple.preferences.extensions"
-                end tell
-                """
-            )
-            script?.executeAndReturnError(nil)
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            process.arguments = [
+                "-b",
+                "com.apple.systempreferences",
+                "/System/Library/PreferencePanes/Extensions.prefPane"
+            ]
+            
+            do {
+                try process.run()
+            } catch {
+                // Handle error silently
+                return
+            }
         }
     }
     

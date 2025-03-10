@@ -683,6 +683,12 @@ public final class GitHubCopilotService:
     private func updateServiceAuthStatus(_ status: GitHubCopilotRequest.CheckStatus.Response) async {
         Logger.gitHubCopilot.info("check status response: \(status)")
         if status.status == .ok || status.status == .maybeOk {
+            if !CopilotModelManager.hasLLMs() {
+                let models = try? await models()
+                if let models = models, !models.isEmpty {
+                    CopilotModelManager.updateLLMs(models)
+                }
+            }
             await Status.shared.updateAuthStatus(.loggedIn, username: status.user)
             await unwatchAuthStatus()
         } else if status.status == .notAuthorized {
@@ -874,6 +880,8 @@ public final class GitHubCopilotService:
 
         if let signoutError {
             throw signoutError
+        } else {
+            CopilotModelManager.clearLLMs()
         }
     }
 }

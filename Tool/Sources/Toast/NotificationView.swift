@@ -15,6 +15,7 @@ struct AutoDismissMessage: View {
                 message.level.color as Color,
                 in: RoundedRectangle(cornerRadius: 8)
             )
+            .frame(minWidth: 300)
     }
 }
 
@@ -53,7 +54,10 @@ public struct NotificationView: View {
                     Spacer()
 
                     if let button = message.button {
-                        Button(action: button.action) {
+                        Button(action: {
+                            button.action()
+                            onDismiss()
+                        }) {
                             Text(button.title)
                                 .padding(.horizontal, 7)
                                 .padding(.vertical, 3)
@@ -76,10 +80,6 @@ public struct NotificationView: View {
         } else {
             AutoDismissMessage(message: message)
                 .frame(maxWidth: .infinity)
-                .overlay {
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.black.opacity(0.3), lineWidth: 1)
-                }
         }
     }
 }
