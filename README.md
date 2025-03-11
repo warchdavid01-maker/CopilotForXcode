@@ -3,7 +3,7 @@
 [GitHub Copilot](https://github.com/features/copilot) is an AI pair programmer
 tool that helps you write code faster and smarter. Copilot for Xcode is an Xcode extension that provides inline coding suggestions as you type and a chat assistant to answer your coding questions.
 
-## Chat [Preview]
+## Chat
 
 GitHub Copilot Chat provides suggestions to your specific coding tasks via chat.
 <img alt="Chat of GitHub Copilot for Xcode" src="./Docs/chat_dark.gif" width="800" />
@@ -12,12 +12,6 @@ GitHub Copilot Chat provides suggestions to your specific coding tasks via chat.
 
 You can receive auto-complete type suggestions from GitHub Copilot either by starting to write the code you want to use, or by writing a natural language comment describing what you want the code to do.
 <img alt="Code Completion of GitHub Copilot for Xcode" src="./Docs/demo.gif" width="800" />
-
-## Preview Policy
-
-Use of the GitHub Copilot Xcode Extension is subject to [GitHub's Pre-Release Terms](https://docs.github.com/en/site-policy/github-terms/github-pre-release-license-terms). We want to remind you that:
-
-> Previews may not be supported or may change at any time. You may receive confidential information through those programs that must remain confidential while the program is private. We'd love your feedback to make our Previews better.
 
 ## Requirements
 
@@ -107,10 +101,10 @@ Use of the GitHub Copilot Xcode Extension is subject to [GitHub's Pre-Release Te
    the full suggestion, and press `option` + `tab` to accept the full suggestion.
 
    <p align="center">
-     <img alt="Screenshot of welcome screen" src="./Docs/welcome.png" width="672" />
+     <img alt="Screenshot of welcome screen" src="./Docs/welcome.png" width="450" />
    </p>
 
-## How to use Chat [Preview]
+## How to use Chat
 
    Open Copilot Chat in GitHub Copilot.
   - Open via the Xcode menu `Xcode -> Editor -> GitHub Copilot -> Open Chat`.
@@ -121,7 +115,7 @@ Use of the GitHub Copilot Xcode Extension is subject to [GitHub's Pre-Release Te
   - Open via GitHub Copilot app menu `Open Chat`.
 
   <p align="center">
-    <img alt="Screenshot of GitHub Copilot menu item" src="./Docs/copilot-menu_dark.png" width="182" />
+    <img alt="Screenshot of GitHub Copilot menu item" src="./Docs/copilot-menu_dark.png" width="244" />
   </p>
 
 ## How to use Code Completion

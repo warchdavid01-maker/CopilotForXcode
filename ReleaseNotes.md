@@ -1,14 +1,22 @@
-### GitHub Copilot for Xcode 0.31.0
-**Highlights:**
+### GitHub Copilot for Xcode 0.32.0
+**🚀 Highlights**
 
-* **Chat view**: Ask Copilot for help with coding tasks directly in the chat view.
-* **Slash commands**: Use quick commands, like `/explain` for code explanations.
-* **Reference code**: Scope chats to specific files for more relevant assistance.
-* **Multiple conversations**: Maintain different threads, each with their own context.
-* **Chat history management**: Keep track of past conversations for future reference.
-* **Free access**: Get [2,000 code completions and 50 chat messages](https://github.com/copilot) per month for free, simply by signing in with your GitHub account or by creating a new one.
+* Model picker for selecting LLM model for chat
+* New `/releaseNotes` slash commands for easier access to release information
 
-**Fixes and improvements:**
+**💪 Improvements**
 
-* Fix acception does not work under certain circumstaances.
-* Support switching focus between chat textfield and file search bar.
+* Auto-switch focus between chat text field and file search bar
+* Support keyboard navigation for file picker in chat context
+* Enhanced instructions for granting accessibility and extension permissions
+* Improved accessibility for chat window
+* Redesigned notification and status bar menu styles
+
+**🛠️ Bug Fixes**
+
+* Resolved compatibility issues with macOS 12
+* Fixed handling of invalid workspace switch event '/'
+* Corrected chat attachment file picker search path to respect workspace scope
+* Fixed icon display across different themes
+* Added support for previously unsupported file types (.md, .txt) in attachments
+* Adjusted incorrect margins in chat window
