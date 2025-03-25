@@ -170,6 +170,7 @@ let package = Package(
             .target(
                 name: "ChatService",
                 dependencies: [
+                    "PersistMiddleware",
                     .product(name: "AppMonitoring", package: "Tool"),
                     .product(name: "Parsing", package: "swift-parsing"),
                     .product(name: "ChatAPIService", package: "Tool"),
@@ -208,6 +209,7 @@ let package = Package(
                     "PromptToCodeService",
                     "ConversationTab",
                     "GitHubCopilotViewModel",
+                    "PersistMiddleware",
                     .product(name: "GitHubCopilotService", package: "Tool"),
                     .product(name: "Toast", package: "Tool"),
                     .product(name: "UserDefaultsObserver", package: "Tool"),
@@ -278,7 +280,17 @@ let package = Package(
                 .product(name: "Highlightr", package: "Highlightr"),
             ]
         ),
-
+        
+        // MARK: Persist Middleware
+        .target(
+            name: "PersistMiddleware",
+            dependencies: [
+                .product(name: "Persist", package: "Tool"),
+                .product(name: "ChatTab", package: "Tool"),
+                .product(name: "ChatAPIService", package: "Tool"),
+                .product(name: "ConversationServiceProvider", package: "Tool")
+            ]
+        )
     ]
 )
 

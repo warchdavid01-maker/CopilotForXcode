@@ -9,6 +9,7 @@ import SwiftUI
 import ChatService
 import SwiftUIFlowLayout
 import XcodeInspector
+import ChatTab
 
 private let r: Double = 8
 
@@ -672,7 +673,7 @@ struct ChatPanelInputArea: View {
         func chatTemplateCompletion(text: String) async -> [ChatTemplate] {
             guard text.count >= 1 && text.first == "/" else { return [] }
             let prefix = text.dropFirst()
-            let promptTemplates = await ChatService.shared.loadChatTemplates() ?? []
+            let promptTemplates = await SharedChatService.shared.loadChatTemplates() ?? []
             let releaseNotesTemplate: ChatTemplate = .init(
                 id: "releaseNotes",
                 description: "What's New",
@@ -797,11 +798,13 @@ struct ChatPanel_Preview: PreviewProvider {
             followUp: .init(message: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce turpis dolor, malesuada quis fringilla sit amet, placerat at nunc. Suspendisse orci tortor, tempor nec blandit a, malesuada vel tellus. Nunc sed leo ligula. Ut at ligula eget turpis pharetra tristique. Integer luctus leo non elit rhoncus fermentum.", id: "3", type: "type")
         ),
     ]
+    
+    static let chatTabInfo = ChatTabInfo(id: "", workspacePath: "path", username: "name")
 
     static var previews: some View {
         ChatPanel(chat: .init(
             initialState: .init(history: ChatPanel_Preview.history, isReceivingMessage: true),
-            reducer: { Chat(service: ChatService.service()) }
+            reducer: { Chat(service: ChatService.service(for: chatTabInfo)) }
         ))
         .frame(width: 450, height: 1200)
         .colorScheme(.dark)
@@ -812,7 +815,7 @@ struct ChatPanel_EmptyChat_Preview: PreviewProvider {
     static var previews: some View {
         ChatPanel(chat: .init(
             initialState: .init(history: [DisplayedChatMessage](), isReceivingMessage: false),
-            reducer: { Chat(service: ChatService.service()) }
+            reducer: { Chat(service: ChatService.service(for: ChatPanel_Preview.chatTabInfo)) }
         ))
         .padding()
         .frame(width: 450, height: 600)
@@ -824,7 +827,7 @@ struct ChatPanel_InputText_Preview: PreviewProvider {
     static var previews: some View {
         ChatPanel(chat: .init(
             initialState: .init(history: ChatPanel_Preview.history, isReceivingMessage: false),
-            reducer: { Chat(service: ChatService.service()) }
+            reducer: { Chat(service: ChatService.service(for: ChatPanel_Preview.chatTabInfo)) }
         ))
         .padding()
         .frame(width: 450, height: 600)
@@ -842,7 +845,7 @@ struct ChatPanel_InputMultilineText_Preview: PreviewProvider {
                     history: ChatPanel_Preview.history,
                     isReceivingMessage: false
                 ),
-                reducer: { Chat(service: ChatService.service()) }
+                reducer: { Chat(service: ChatService.service(for: ChatPanel_Preview.chatTabInfo)) }
             )
         )
         .padding()
@@ -855,7 +858,7 @@ struct ChatPanel_Light_Preview: PreviewProvider {
     static var previews: some View {
         ChatPanel(chat: .init(
             initialState: .init(history: ChatPanel_Preview.history, isReceivingMessage: true),
-            reducer: { Chat(service: ChatService.service()) }
+            reducer: { Chat(service: ChatService.service(for: ChatPanel_Preview.chatTabInfo)) }
         ))
         .padding()
         .frame(width: 450, height: 600)

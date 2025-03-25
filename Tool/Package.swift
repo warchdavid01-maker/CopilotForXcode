@@ -77,7 +77,8 @@ let package = Package(
         ),
         .package(url: "https://github.com/GottaGetSwifty/CodableWrappers", from: "2.0.7"),
         // TODO: remove CopilotForXcodeKit dependency once extension provider logic is removed.
-        .package(url: "https://github.com/devm33/CopilotForXcodeKit", branch: "main")
+        .package(url: "https://github.com/devm33/CopilotForXcodeKit", branch: "main"),
+        .package(url: "https://github.com/stephencelis/SQLite.swift", from: "0.15.3")
     ],
     targets: [
         // MARK: - Helpers
@@ -245,7 +246,8 @@ let package = Package(
             name: "Persist",
             dependencies: [
                 "Logger",
-                "Status"
+                "Status",
+                .product(name: "SQLite", package: "SQLite.Swift")
             ]
         ),
 
@@ -332,7 +334,7 @@ let package = Package(
         
         // MARK: - SystemUtils
         
-        .target(name: "SystemUtils"),
+        .target(name: "SystemUtils")
     ]
 )
 

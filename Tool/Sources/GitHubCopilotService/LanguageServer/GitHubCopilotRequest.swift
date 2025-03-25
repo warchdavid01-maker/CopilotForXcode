@@ -393,7 +393,6 @@ public enum GitHubCopilotNotification {
     public struct StatusNotification: Codable {
         public enum StatusKind : String, Codable {
             case normal = "Normal"
-            case inProgress = "InProgress"
             case error = "Error"
             case warning = "Warning"
             case inactive = "Inactive"
@@ -402,8 +401,6 @@ public enum GitHubCopilotNotification {
                 switch self {
                 case .normal:
                         .normal
-                case .inProgress:
-                        .inProgress
                 case .error:
                         .error
                 case .warning:
@@ -414,7 +411,8 @@ public enum GitHubCopilotNotification {
             }
         }
 
-        public var status: StatusKind
+        public var kind: StatusKind
+        public var busy: Bool
         public var message: String
 
         public static func decode(fromParams params: JSONValue?) -> StatusNotification? {

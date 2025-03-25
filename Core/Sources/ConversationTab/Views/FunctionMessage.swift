@@ -3,6 +3,7 @@ import SwiftUI
 import ChatService
 import SharedUIComponents
 import ComposableArchitecture
+import ChatTab
 
 struct FunctionMessage: View {
     let chat: StoreOf<Chat>
@@ -123,13 +124,15 @@ struct FunctionMessage: View {
     }
 }
 
-#Preview {
-    FunctionMessage(
-        chat: .init(initialState: .init(), reducer: { Chat(service: ChatService.service()) }),
-        id: "1",
-        text: "You've reached your monthly chat limit. Upgrade to Copilot Pro (30-day free trial) or wait until 1/17/2025, 8:00:00 AM for your limit to reset."
-    )
-    .padding()
-    .fixedSize()
+struct FunctionMessage_Previews: PreviewProvider {
+    static var previews: some View {
+        let chatTabInfo = ChatTabInfo(id: "id", workspacePath: "path", username: "name")
+        FunctionMessage(
+            chat: .init(initialState: .init(), reducer: { Chat(service: ChatService.service(for: chatTabInfo)) }),
+            id: "1",
+            text: "You've reached your monthly chat limit. Upgrade to Copilot Pro (30-day free trial) or wait until 1/17/2025, 8:00:00 AM for your limit to reset."
+        )
+        .padding()
+        .fixedSize()
+    }
 }
-

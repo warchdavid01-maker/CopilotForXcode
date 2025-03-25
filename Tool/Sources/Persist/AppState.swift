@@ -70,27 +70,7 @@ public class AppState {
     }
 
     private func configFilePath(userName: String) -> URL {
-        let baseURL: URL = getXdgConfigHome()
-            .appendingPathComponent("github-copilot/xcode")
-            .appendingPathComponent(toHash(contents: userName))
-        let fileManager = FileManager.default
-        if !fileManager.fileExists(atPath: baseURL.path) {
-            do {
-                try fileManager.createDirectory(at: baseURL, withIntermediateDirectories: true, attributes: nil)
-            } catch {
-                Logger.client.info("Failed to create directory: \(error)")
-            }
-        }
-
-        return baseURL.appendingPathComponent(cacheFileName)
-    }
-
-    private func getXdgConfigHome() -> URL {
-        if let xdgConfigHome = ProcessInfo.processInfo.environment["XDG_CONFIG_HOME"],
-           xdgConfigHome.hasPrefix("/") {
-            return URL(fileURLWithPath: xdgConfigHome)
-        }
-        return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".config")
+        return ConfigPathUtils.configFilePath(userName: userName, fileName: cacheFileName)
     }
 
     private func saveCacheForUser(_ userName: String? = nil) {

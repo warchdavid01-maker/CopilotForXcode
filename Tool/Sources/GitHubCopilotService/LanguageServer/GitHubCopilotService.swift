@@ -58,7 +58,8 @@ public protocol GitHubCopilotConversationServiceType {
                             skills: [String],
                             ignoredSkills: [String]?,
                             references: [FileReference],
-                            model: String?) async throws
+                            model: String?,
+                            turns: [TurnSchema]) async throws
     func createTurn(_ message: String,
                     workDoneToken: String,
                     conversationId: String,
@@ -459,9 +460,20 @@ public final class GitHubCopilotService:
                                    skills: [String],
                                    ignoredSkills: [String]?,
                                    references: [FileReference],
-                                   model: String?) async throws {
+                                   model: String?,
+                                   turns: [TurnSchema]) async throws {
+        var conversationCreateTurns: [ConversationTurn] = []
+        // invoke conversation history
+        if turns.count > 0 {
+            conversationCreateTurns.append(
+                contentsOf: turns.map {
+                    ConversationTurn(request: $0.request, response: $0.response, turnId: $0.turnId)
+                }
+            )
+        }
+        conversationCreateTurns.append(ConversationTurn(request: message))
         let params = ConversationCreateParams(workDoneToken: workDoneToken,
-                                              turns: [ConversationTurn(request: message)],
+                                              turns: conversationCreateTurns,
                                               capabilities: ConversationCreateParams.Capabilities(
                                                 skills: skills,
                                                 allSkills: false),

@@ -13,6 +13,10 @@ import XcodeInspector
 import XcodeThemeController
 import XPCShared
 import SuggestionWidget
+import Status
+import ChatService
+import Persist
+import PersistMiddleware
 
 @globalActor public enum ServiceActor {
     public actor TheActor {}
@@ -97,22 +101,30 @@ public final class Service {
                 .sink { [weak self] fileURL in
                     Task {
                         do {
-                            try await self?.workspacePool
+                            let _ = try await self?.workspacePool
                                 .fetchOrCreateWorkspaceAndFilespace(fileURL: fileURL)
-                        } catch {
+                        } catch let error as Workspace.WorkspaceFileError {
+                            Logger.workspacePool
+                                .info(error.localizedDescription)
+                        }
+                        catch {
                             Logger.workspacePool.error(error)
                         }
                     }
                 }.store(in: &cancellable)
             
-            await XcodeInspector.shared.safe.$activeWorkspaceURL.receive(on: DispatchQueue.main)
-                .sink { newURL in
-                    if let path = newURL?.path, path != "/", self.guiController.store.chatHistory.selectedWorkspacePath != path {
-                        let name = self.getDisplayNameOfXcodeWorkspace(url: newURL!)
-                        self.guiController.store.send(.switchWorkspace(path: path, name: name))
-                    }
-                    
-                }.store(in: &cancellable)
+            // Combine both workspace and auth status changes into a single stream
+            await Publishers.CombineLatest(
+                XcodeInspector.shared.safe.$activeWorkspaceURL
+                    .removeDuplicates(),
+                StatusObserver.shared.$authStatus
+                    .removeDuplicates()
+                )
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] newURL, newStatus in
+                    self?.onNewActiveWorkspaceURLOrAuthStatus(newURL: newURL, newStatus: newStatus)
+                }
+                .store(in: &cancellable)
         }
     }
 
@@ -146,3 +158,44 @@ public extension Service {
     }
 }
 
+// internal extension
+extension Service {
+    
+    func onNewActiveWorkspaceURLOrAuthStatus(newURL: URL?, newStatus: AuthStatus) {
+        Task { @MainActor in
+                  // check path
+            guard let path = newURL?.path, path != "/",
+                  // check auth status
+                  newStatus.status == .loggedIn,
+                  let username = newStatus.username, !username.isEmpty,
+                  // Switch workspace only when the `workspace` or `username` is not the same as the current one
+                  (
+                    self.guiController.store.chatHistory.selectedWorkspacePath != path ||
+                    self.guiController.store.chatHistory.currentUsername != username
+                  )
+            else { return }
+            
+            await self.doSwitchWorkspace(workspaceURL: newURL!, username: username)
+        }
+    }
+    
+    /// - Parameters:
+    ///   - workspaceURL: The  active workspace URL that need switch to
+    ///   - path: Path of the workspace URL
+    ///   - username: Curent github username
+    @MainActor
+    func doSwitchWorkspace(workspaceURL: URL, username: String) async {
+        // get workspace display name
+        let name = self.getDisplayNameOfXcodeWorkspace(url: workspaceURL)
+        let path = workspaceURL.path
+        
+        // switch workspace and username
+        self.guiController.store.send(.switchWorkspace(path: path, name: name, username: username))
+        
+        // restore if needed
+        await self.guiController.restore(path: path, name: name, username: username)
+        
+        // init chat tab if no history tab
+        self.guiController.store.send(.initWorkspaceChatTabIfNeeded(path: path, username: username))
+    }
+}

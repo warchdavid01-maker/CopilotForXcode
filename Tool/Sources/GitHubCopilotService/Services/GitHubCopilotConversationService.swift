@@ -21,7 +21,8 @@ public final class GitHubCopilotConversationService: ConversationServiceType {
                                                     skills: request.skills,
                                                     ignoredSkills: request.ignoredSkills,
                                                     references: request.references ?? [],
-                                                    model: request.model)
+                                                    model: request.model,
+                                                    turns: request.turns)
     }
     
     public func createTurn(with conversationId: String, request: ConversationRequest, workspace: WorkspaceInfo) async throws {

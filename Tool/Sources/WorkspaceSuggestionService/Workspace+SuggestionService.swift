@@ -32,6 +32,12 @@ public extension Workspace {
             "Suggestion feature is disabled for this project."
         }
     }
+    
+    struct EditorCursorOutOfScopeError: Error, LocalizedError {
+        public var errorDescription: String? {
+            "Cursor position is out of scope."
+        }
+    }
 }
 
 public extension Workspace {
@@ -42,6 +48,10 @@ public extension Workspace {
         editor: EditorContent
     ) async throws -> [CodeSuggestion] {
         refreshUpdateTime()
+        
+        guard editor.cursorPosition != .outOfScope else {
+            throw EditorCursorOutOfScopeError()
+        }
 
         let filespace = try createFilespaceIfNeeded(fileURL: fileURL)
 

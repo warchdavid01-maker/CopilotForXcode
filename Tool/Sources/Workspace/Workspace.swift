@@ -3,6 +3,7 @@ import Preferences
 import UserDefaultsObserver
 import XcodeInspector
 import Logger
+import UniformTypeIdentifiers
 
 enum Environment {
     static var now = { Date() }
@@ -53,6 +54,7 @@ public final class Workspace {
     public enum WorkspaceFileError: LocalizedError {
         case unsupportedFile(extensionName: String)
         case fileNotFound(fileURL: URL)
+        case invalidFileFormat(fileURL: URL)
         
         public var errorDescription: String? {
             switch self {
@@ -60,6 +62,8 @@ public final class Workspace {
                 return "File type \(extensionName) unsupported."
             case .fileNotFound(let fileURL):
                 return "File \(fileURL) not found."
+            case .invalidFileFormat(let fileURL):
+                return "The file \(fileURL.lastPathComponent) couldn't be opened because it isn't in the correct format."
             }
         }
     }
@@ -138,6 +142,11 @@ public final class Workspace {
         
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
             throw WorkspaceFileError.fileNotFound(fileURL: fileURL)
+        }
+        
+        if let contentType = try fileURL.resourceValues(forKeys: [.contentTypeKey]).contentType,
+           !contentType.conforms(to: UTType.data) {
+            throw WorkspaceFileError.invalidFileFormat(fileURL: fileURL)
         }
         
         let existedFilespace = filespaces[fileURL]

@@ -286,10 +286,17 @@ extension CustomJSONRPCLanguageServer {
                 Logger.gitHubCopilot.info("\(anyNotification.method): \(debugDescription)")
                 block(nil)
                 return true
-            case "statusNotification":
+            case "didChangeStatus":
                 Logger.gitHubCopilot.info("\(anyNotification.method): \(debugDescription)")
                 if let payload = GitHubCopilotNotification.StatusNotification.decode(fromParams: anyNotification.params) {
-                    Task { await Status.shared.updateCLSStatus(payload.status.clsStatus, message: payload.message) }
+                    Task {
+                        await Status.shared
+                            .updateCLSStatus(
+                                payload.kind.clsStatus,
+                                busy: payload.busy,
+                                message: payload.message
+                            )
+                    }
                 }
                 block(nil)
                 return true
@@ -297,7 +304,7 @@ extension CustomJSONRPCLanguageServer {
                 notificationPublisher.send(anyNotification)
                 block(nil)
                 return true
-            case "conversation/preconditionsNotification":
+            case "conversation/preconditionsNotification", "statusNotification":
                 // Ignore
                 block(nil)
                 return true

@@ -452,18 +452,18 @@ struct ChatWindowView_Previews: PreviewProvider {
                 chatHistory: .init(
                     workspaces: [
                         .init(
-                            id: "activeWorkspacePath",
+                            id: .init(path: "p", username: "u"),
                             tabInfo: [
-                                .init(id: "2", title: "Empty-2"),
-                                .init(id: "3", title: "Empty-3"),
-                                .init(id: "4", title: "Empty-4"),
-                                .init(id: "5", title: "Empty-5"),
-                                .init(id: "6", title: "Empty-6"),
-                                .init(id: "7", title: "Empty-7"),
+                                .init(id: "2", title: "Empty-2", workspacePath: "path", username: "username"),
+                                .init(id: "3", title: "Empty-3", workspacePath: "path", username: "username"),
+                                .init(id: "4", title: "Empty-4", workspacePath: "path", username: "username"),
+                                .init(id: "5", title: "Empty-5", workspacePath: "path", username: "username"),
+                                .init(id: "6", title: "Empty-6", workspacePath: "path", username: "username"),
+                                .init(id: "7", title: "Empty-7", workspacePath: "path", username: "username"),
                             ] as IdentifiedArray<String, ChatTabInfo>,
                             selectedTabId: "2"
                         )
-                    ] as IdentifiedArray<String, ChatWorkspace>,
+                    ] as IdentifiedArray<WorkspaceIdentifier, ChatWorkspace>,
                     selectedWorkspacePath: "activeWorkspacePath",
                     selectedWorkspaceName: "activeWorkspacePath"
                 ),

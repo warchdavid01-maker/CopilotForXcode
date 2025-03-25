@@ -22,7 +22,7 @@ public protocol ConversationServiceProvider {
     func models() async throws -> [CopilotModel]?
 }
 
-public struct FileReference: Hashable {
+public struct FileReference: Hashable, Codable, Equatable {
     public let url: URL
     public let relativePath: String?
     public let fileName: String?
@@ -66,6 +66,20 @@ extension FileReference {
     }
 }
 
+public struct TurnSchema: Codable {
+    public var request: String
+    public var response: String?
+    public var agentSlug: String?
+    public var turnId: String?
+    
+    public init(request: String, response: String? = nil, agentSlug: String? = nil, turnId: String? = nil) {
+        self.request = request
+        self.response = response
+        self.agentSlug = agentSlug
+        self.turnId = turnId
+    }
+}
+
 public struct ConversationRequest {
     public var workDoneToken: String
     public var content: String
@@ -74,6 +88,7 @@ public struct ConversationRequest {
     public var ignoredSkills: [String]?
     public var references: [FileReference]?
     public var model: String?
+    public var turns: [TurnSchema]
 
     public init(
         workDoneToken: String,
@@ -82,7 +97,8 @@ public struct ConversationRequest {
         skills: [String],
         ignoredSkills: [String]? = nil,
         references: [FileReference]? = nil,
-        model: String? = nil
+        model: String? = nil,
+        turns: [TurnSchema] = []
     ) {
         self.workDoneToken = workDoneToken
         self.content = content
@@ -91,6 +107,7 @@ public struct ConversationRequest {
         self.ignoredSkills = ignoredSkills
         self.references = references
         self.model = model
+        self.turns = turns
     }
 }
 
@@ -123,77 +140,6 @@ public enum CopyKind: Int, Codable {
     case toolbar = 2
 }
 
-public struct ConversationReference: Codable, Equatable {
-    public enum Kind: String, Codable {
-        case `class`
-        case `struct`
-        case `enum`
-        case `actor`
-        case `protocol`
-        case `extension`
-        case `case`
-        case property
-        case `typealias`
-        case function
-        case method
-        case text
-        case webpage
-        case other
-    }
-    
-    public enum Status: String, Codable {
-        case included, blocked, notfound, empty
-    }
-
-    public var uri: String
-    public var status: Status?
-    @FallbackDecoding<ReferenceKindFallback>
-    public var kind: Kind
-    
-    public var ext: String {
-        return url?.pathExtension ?? ""
-    }
-    
-    public var fileName: String {
-        return url?.lastPathComponent ?? ""
-    }
-    
-    public var filePath: String {
-        return url?.path ?? ""
-    }
-    
-    public var url: URL? {
-        return URL(string: uri)
-    }
-
-    public init(
-        uri: String,
-        status: Status?,
-        kind: Kind
-    ) {
-        self.uri = uri
-        self.status = status
-        self.kind = kind
-        
-    }
-}
-
-extension ConversationReference {
-    public func getPathRelativeToHome() -> String {
-        guard !filePath.isEmpty else { return filePath}
-        
-        let homeDirectory = FileManager.default.homeDirectoryForCurrentUser.path
-        if !homeDirectory.isEmpty{
-            return filePath.replacingOccurrences(of: homeDirectory, with: "~")
-        }
-        
-        return filePath
-    }
-}
-
-public struct ReferenceKindFallback: FallbackValueProvider {
-    public static var defaultValue: ConversationReference.Kind { .other }
-}
 
 public struct ConversationFollowUp: Codable, Equatable {
     public var message: String

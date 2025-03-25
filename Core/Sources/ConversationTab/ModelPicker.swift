@@ -108,7 +108,7 @@ struct ModelPicker: View {
 
     @MainActor
     func refreshModels() async {
-        let copilotModels = await ChatService.shared.copilotModels()
+        let copilotModels = await SharedChatService.shared.copilotModels()
         if !copilotModels.isEmpty {
             CopilotModelManager.updateLLMs(copilotModels)
         }

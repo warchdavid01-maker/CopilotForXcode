@@ -44,9 +44,9 @@ struct Chat {
 
     @ObservableState
     struct State: Equatable {
+        // Not use anymore. the title of history tab will get from chat tab info
+        // Keep this var as `ChatTabItemView` reference this
         var title: String = "New Chat"
-        var isTitleSet: Bool = false
-
         var typedMessage = ""
         var history: [DisplayedChatMessage] = []
         var isReceivingMessage = false
@@ -96,7 +96,6 @@ struct Chat {
         case setCurrentEditor(FileReference)
         
         case followUpButtonClicked(String, String)
-        case setTitle(DisplayedChatMessage)
     }
 
     let service: ChatService
@@ -288,20 +287,6 @@ struct Chat {
 
                     return all
                 }
-                
-                guard let lastChatMessage = state.history.last else { return .none }
-                return .run { send in
-                    await send(.setTitle(lastChatMessage))
-                }
-                
-            case let .setTitle(message):
-                guard state.isTitleSet == false,
-                      message.role == .assistant,
-                      let suggestedTitle = message.suggestedTitle
-                else { return .none }
-                
-                state.title = suggestedTitle
-                state.isTitleSet = true
                 
                 return .none
 

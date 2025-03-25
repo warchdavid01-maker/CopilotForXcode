@@ -5,7 +5,8 @@ import MarkdownUI
 import SharedUIComponents
 import SwiftUI
 import ConversationServiceProvider
-
+import ChatTab
+import ChatAPIService
 
 struct BotMessage: View {
     var r: Double { messageBubbleCornerRadius }
@@ -217,60 +218,65 @@ struct ReferenceList: View {
     }
 }
 
-#Preview("Bot Message") {
-    BotMessage(
-        id: "1",
-        text: """
-        **Hey**! What can I do for you?**Hey**! What can I do for you?**Hey**! What can I do for you?**Hey**! What can I do for you?
-        ```swift
-        func foo() {}
-        ```
-        """,
-        references: .init(repeating: .init(
-            uri: "/Core/Sources/ConversationTab/Views/BotMessage.swift",
-            status: .included,
-            kind: .class
-        ), count: 2),
-        followUp: ConversationFollowUp(message: "followup question", id: "id", type: "type"),
-        errorMessage: "Sorry, an error occurred while generating a response.",
-        chat: .init(initialState: .init(), reducer: { Chat(service: ChatService.service()) })
-    )
-    .padding()
-    .fixedSize(horizontal: true, vertical: true)
+struct BotMessage_Previews: PreviewProvider {
+    static var previews: some View {
+        let chatTabInfo = ChatTabInfo(id: "id", workspacePath: "path", username: "name")
+        BotMessage(
+            id: "1",
+            text: """
+            **Hey**! What can I do for you?**Hey**! What can I do for you?**Hey**! What can I do for you?**Hey**! What can I do for you?
+            ```swift
+            func foo() {}
+            ```
+            """,
+            references: .init(repeating: .init(
+                uri: "/Core/Sources/ConversationTab/Views/BotMessage.swift",
+                status: .included,
+                kind: .class
+            ), count: 2),
+            followUp: ConversationFollowUp(message: "followup question", id: "id", type: "type"),
+            errorMessage: "Sorry, an error occurred while generating a response.",
+            chat: .init(initialState: .init(), reducer: { Chat(service: ChatService.service(for: chatTabInfo)) })
+        )
+        .padding()
+        .fixedSize(horizontal: true, vertical: true)
+    }
 }
 
-#Preview("Reference List") {
-    ReferenceList(references: [
-        .init(
-            uri: "/Core/Sources/ConversationTab/Views/BotMessage.swift",
-            status: .included,
-            kind: .class
-        ),
-        .init(
-            uri: "/Core/Sources/ConversationTab/Views",
-            status: .included,
-            kind: .struct
-        ),
-        .init(
-            uri: "/Core/Sources/ConversationTab/Views/BotMessage.swift",
-            status: .included,
-            kind: .function
-        ),
-        .init(
-            uri: "/Core/Sources/ConversationTab/Views/BotMessage.swift",
-            status: .included,
-            kind: .case
-        ),
-        .init(
-            uri: "/Core/Sources/ConversationTab/Views/BotMessage.swift",
-            status: .included,
-            kind: .extension
-        ),
-        .init(
-            uri: "/Core/Sources/ConversationTab/Views/BotMessage.swift",
-            status: .included,
-            kind: .webpage
-        ),
-    ], chat: .init(initialState: .init(), reducer: { Chat(service: ChatService.service()) }))
+struct ReferenceList_Previews: PreviewProvider {
+    static var previews: some View {
+        let chatTabInfo = ChatTabInfo(id: "id", workspacePath: "path", username: "name")
+        ReferenceList(references: [
+            .init(
+                uri: "/Core/Sources/ConversationTab/Views/BotMessage.swift",
+                status: .included,
+                kind: .class
+            ),
+            .init(
+                uri: "/Core/Sources/ConversationTab/Views",
+                status: .included,
+                kind: .struct
+            ),
+            .init(
+                uri: "/Core/Sources/ConversationTab/Views/BotMessage.swift",
+                status: .included,
+                kind: .function
+            ),
+            .init(
+                uri: "/Core/Sources/ConversationTab/Views/BotMessage.swift",
+                status: .included,
+                kind: .case
+            ),
+            .init(
+                uri: "/Core/Sources/ConversationTab/Views/BotMessage.swift",
+                status: .included,
+                kind: .extension
+            ),
+            .init(
+                uri: "/Core/Sources/ConversationTab/Views/BotMessage.swift",
+                status: .included,
+                kind: .webpage
+            ),
+        ], chat: .init(initialState: .init(), reducer: { Chat(service: ChatService.service(for: chatTabInfo)) }))
+    }
 }
-

@@ -10,8 +10,9 @@ import Foundation
 }
 
 public struct CLSStatus: Equatable {
-    public enum Status { case unknown, normal, inProgress, error, warning, inactive }
+    public enum Status { case unknown, normal, error, warning, inactive }
     public let status: Status
+    public let busy: Bool
     public let message: String
     
     public var isInactiveStatus: Bool { status == .inactive && !message.isEmpty }
@@ -85,7 +86,7 @@ public final actor Status {
 
     private var extensionStatus: ExtensionPermissionStatus = .unknown
     private var axStatus: ObservedAXStatus = .unknown
-    private var clsStatus = CLSStatus(status: .unknown, message: "")
+    private var clsStatus = CLSStatus(status: .unknown, busy: false, message: "")
     private var authStatus = AuthStatus(status: .unknown, username: nil, message: nil)
 
     private let okIcon = StatusResponse.Icon(name: "MenuBarIcon")
@@ -110,8 +111,8 @@ public final actor Status {
         broadcast()
     }
 
-    public func updateCLSStatus(_ status: CLSStatus.Status, message: String) {
-        let newStatus = CLSStatus(status: status, message: message)
+    public func updateCLSStatus(_ status: CLSStatus.Status, busy: Bool, message: String) {
+        let newStatus = CLSStatus(status: status, busy: busy, message: message)
         guard newStatus != clsStatus else { return }
         clsStatus = newStatus
         broadcast()
@@ -162,7 +163,7 @@ public final actor Status {
         let accessibilityStatusInfo: AccessibilityStatusInfo = getAccessibilityStatusInfo()
         return .init(
             icon: authStatusInfo.authIcon ?? clsStatusInfo.icon ?? extensionStatusIcon ?? accessibilityStatusInfo.icon ?? okIcon,
-            inProgress: clsStatus.status == .inProgress,
+            inProgress: clsStatus.busy,
             clsMessage: clsStatus.message,
             message: accessibilityStatusInfo.message,
             extensionStatus: extensionStatus,

@@ -15,7 +15,7 @@ public struct Doc: Codable {
     var uri: String
 }
 
-public struct Reference: Codable {
+public struct Reference: Codable, Equatable, Hashable {
     public var type: String = "file"
     public let uri: String
     public let position: Position?
