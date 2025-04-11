@@ -6,6 +6,7 @@ import GitHubCopilotService
 import SwiftUI
 import PersistMiddleware
 import ConversationTab
+import HostAppActivator
 
 public enum ChatTabBuilderCollection: Equatable {
     case folder(title: String, kinds: [ChatTabKind])
@@ -126,6 +127,7 @@ public struct ChatPanelFeature {
         case exitFullScreen
         case presentChatPanel(forceDetach: Bool)
         case switchWorkspace(String, String, String)
+        case openSettings
 
         // Tabs
         case updateChatHistory(ChatWorkspace)
@@ -144,7 +146,6 @@ public struct ChatPanelFeature {
         // Chat History
         case chatHistoryItemClicked(id: String)
         case chatHisotryDeleteButtonClicked(id: String)
-
         case chatTab(id: String, action: ChatTabItem.Action)
         
         // persist
@@ -246,6 +247,9 @@ public struct ChatPanelFeature {
                     let identifier = WorkspaceIdentifier(path: path, username: username)
                     state.chatHistory.addWorkspace(ChatWorkspace(id: identifier))
                 }
+                return .none
+            case .openSettings:
+                try? launchHostAppSettings()
                 return .none
             case let .updateChatHistory(chatWorkspace):
                 state.chatHistory.updateHistory(chatWorkspace)
@@ -565,4 +569,3 @@ extension ChatWorkspace {
         return (originalTabInfo, chatTabInfo)
     }
 }
-

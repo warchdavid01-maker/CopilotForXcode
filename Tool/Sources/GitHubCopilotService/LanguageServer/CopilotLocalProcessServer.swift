@@ -149,6 +149,19 @@ extension CopilotLocalProcessServer: LanguageServerProtocol.Server {
 
         server.sendNotification(notif, completionHandler: completionHandler)
     }
+    
+    /// send copilot specific notification
+    public func sendCopilotNotification(
+        _ notif: CopilotClientNotification,
+        completionHandler: @escaping (ServerError?) -> Void
+    ) {
+        guard let server = wrappedServer, process.isRunning else {
+            completionHandler(.serverUnavailable)
+            return
+        }
+
+        server.sendCopilotNotification(notif, completionHandler: completionHandler)
+    }
 
     /// Cancel ongoing completion requests.
     public func cancelOngoingTasks() async {
@@ -193,6 +206,10 @@ extension CopilotLocalProcessServer: LanguageServerProtocol.Server {
 
         server.sendRequest(request, completionHandler: completionHandler)
     }
+}
+
+protocol CopilotNotificationJSONRPCLanguageServer {
+    func sendCopilotNotification(_ notif: CopilotClientNotification, completionHandler: @escaping (ServerError?) -> Void)
 }
 
 final class CustomJSONRPCLanguageServer: Server {
@@ -342,3 +359,44 @@ extension CustomJSONRPCLanguageServer {
     }
 }
 
+// MARK: - Copilot custom notification
+
+public struct CopilotDidChangeWatchedFilesParams: Codable, Hashable {
+    /// The CLS need an additional paramter `workspaceUri` for "workspace/didChangeWatchedFiles" event
+    public var workspaceUri: String
+    public var changes: [FileEvent]
+
+    public init(workspaceUri: String, changes: [FileEvent]) {
+        self.workspaceUri = workspaceUri
+        self.changes = changes
+    }
+}
+
+public enum CopilotClientNotification {
+    public enum Method: String {
+        case workspaceDidChangeWatchedFiles = "workspace/didChangeWatchedFiles"
+    }
+    
+    case copilotDidChangeWatchedFiles(CopilotDidChangeWatchedFilesParams)
+    
+    public var method: Method {
+        switch self {
+        case .copilotDidChangeWatchedFiles:
+            return .workspaceDidChangeWatchedFiles
+        }
+    }
+}
+
+extension CustomJSONRPCLanguageServer: CopilotNotificationJSONRPCLanguageServer {
+    public func sendCopilotNotification(_ notif: CopilotClientNotification, completionHandler: @escaping (ServerError?) -> Void) {
+        let method = notif.method.rawValue
+        
+        switch notif {
+        case .copilotDidChangeWatchedFiles(let params):
+            // the protocolTransport is not exposed by LSP Server, need to use it directly
+            protocolTransport.sendNotification(params, method: method) { error in
+                completionHandler(error.map({ .unableToSendNotification($0) }))
+            }
+        }
+    }
+}

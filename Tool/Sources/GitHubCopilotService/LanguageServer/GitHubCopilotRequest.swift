@@ -356,6 +356,16 @@ enum GitHubCopilotRequest {
             .custom("copilot/models", .hash([:]))
         }
     }
+    
+    // MARK: - Conversation Agents
+    
+    struct GetAgents: GitHubCopilotRequestType {
+        typealias Response = Array<ChatAgent>
+
+        var request: ClientRequest {
+            .custom("conversation/agents", .hash([:]))
+        }
+    }
 
     // MARK: Copy code
 

@@ -13,6 +13,7 @@ extension ChatMessage {
         var followUp: ConversationFollowUp?
         var suggestedTitle: String?
         var errorMessage: String?
+        var steps: [ConversationProgressStep]
     }
     
     func toTurnItem() -> TurnItem {
@@ -22,7 +23,8 @@ extension ChatMessage {
             references: self.references,
             followUp: self.followUp,
             suggestedTitle: self.suggestedTitle,
-            errorMessage: self.errorMessage
+            errorMessage: self.errorMessage,
+            steps: self.steps
         )
         
         // TODO: handle exception
@@ -52,6 +54,7 @@ extension ChatMessage {
                     suggestedTitle: turnItemData.suggestedTitle,
                     errorMessage: turnItemData.errorMessage,
                     rating: turnItemData.rating,
+                    steps: turnItemData.steps,
                     createdAt: turnItem.createdAt,
                     updatedAt: turnItem.updatedAt
                 )
