@@ -114,15 +114,28 @@ public final class Service {
                 }.store(in: &cancellable)
             
             // Combine both workspace and auth status changes into a single stream
-            await Publishers.CombineLatest(
+            await Publishers.CombineLatest3(
+                XcodeInspector.shared.safe.$latestActiveXcode,
                 XcodeInspector.shared.safe.$activeWorkspaceURL
                     .removeDuplicates(),
                 StatusObserver.shared.$authStatus
                     .removeDuplicates()
                 )
                 .receive(on: DispatchQueue.main)
-                .sink { [weak self] newURL, newStatus in
-                    self?.onNewActiveWorkspaceURLOrAuthStatus(newURL: newURL, newStatus: newStatus)
+                .sink { [weak self] newXcode, newURL, newStatus in
+                    // First check for realtimeWorkspaceURL if activeWorkspaceURL is nil
+                    if let realtimeURL = newXcode?.realtimeWorkspaceURL, newURL == nil {
+                        self?.onNewActiveWorkspaceURLOrAuthStatus(
+                            newURL: realtimeURL,
+                            newStatus: newStatus
+                        )
+                    } else if let newURL = newURL {
+                        // Then use activeWorkspaceURL if available
+                        self?.onNewActiveWorkspaceURLOrAuthStatus(
+                            newURL: newURL,
+                            newStatus: newStatus
+                        )
+                    }
                 }
                 .store(in: &cancellable)
         }
@@ -137,7 +150,7 @@ public final class Service {
 
     private func getDisplayNameOfXcodeWorkspace(url: URL) -> String {
         var name = url.lastPathComponent
-        let suffixes = [".xcworkspace", ".xcodeproj"]
+        let suffixes = [".xcworkspace", ".xcodeproj", ".playground"]
         for suffix in suffixes {
             if name.hasSuffix(suffix) {
                 name = String(name.dropLast(suffix.count))

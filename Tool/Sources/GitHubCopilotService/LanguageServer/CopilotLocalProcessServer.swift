@@ -311,7 +311,7 @@ extension CustomJSONRPCLanguageServer {
                             .updateCLSStatus(
                                 payload.kind.clsStatus,
                                 busy: payload.busy,
-                                message: payload.message
+                                message: payload.message ?? ""
                             )
                     }
                 }

@@ -761,11 +761,24 @@ struct ChatPanelInputArea: View {
             return result
         }
         func subscribeToActiveDocumentChangeEvent() {
-            XcodeInspector.shared.$activeDocumentURL.receive(on: DispatchQueue.main)
-                .sink { newDocURL in
-                    if supportedFileExtensions.contains(newDocURL?.pathExtension ?? "") {
-                        let currentEditor = FileReference(url: newDocURL!, isCurrentEditor: true)
-                        chat.send(.setCurrentEditor(currentEditor))
+            Publishers.CombineLatest(
+                XcodeInspector.shared.$latestActiveXcode,
+                XcodeInspector.shared.$activeDocumentURL
+                    .removeDuplicates()
+                )
+                .receive(on: DispatchQueue.main)
+                .sink { newXcode, newDocURL in
+                    // First check for realtimeWorkspaceURL if activeWorkspaceURL is nil
+                    if let realtimeURL = newXcode?.realtimeDocumentURL, newDocURL == nil {
+                        if supportedFileExtensions.contains(realtimeURL.pathExtension) {
+                            let currentEditor = FileReference(url: realtimeURL, isCurrentEditor: true)
+                            chat.send(.setCurrentEditor(currentEditor))
+                        }
+                    } else {
+                        if supportedFileExtensions.contains(newDocURL?.pathExtension ?? "") {
+                            let currentEditor = FileReference(url: newDocURL!, isCurrentEditor: true)
+                            chat.send(.setCurrentEditor(currentEditor))
+                        }
                     }
                 }
                 .store(in: &cancellable)

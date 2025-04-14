@@ -207,7 +207,18 @@ public class GitHubCopilotBaseService {
             server.defaultTimeout = 60
             server.initializeParamsProvider = {
                 let capabilities = ClientCapabilities(
-                    workspace: nil,
+                    workspace: .init(
+                        applyEdit: false,
+                        workspaceEdit: nil,
+                        didChangeConfiguration: nil,
+                        didChangeWatchedFiles: nil,
+                        symbol: nil,
+                        executeCommand: nil,
+                        /// enable for "watchedFiles capability", set others to default value
+                        workspaceFolders: true,
+                        configuration: nil,
+                        semanticTokens: nil
+                    ),
                     textDocument: nil,
                     window: nil,
                     general: nil,
@@ -726,13 +737,13 @@ public final class GitHubCopilotService:
     private func updateServiceAuthStatus(_ status: GitHubCopilotRequest.CheckStatus.Response) async {
         Logger.gitHubCopilot.info("check status response: \(status)")
         if status.status == .ok || status.status == .maybeOk {
+            await Status.shared.updateAuthStatus(.loggedIn, username: status.user)
             if !CopilotModelManager.hasLLMs() {
                 let models = try? await models()
                 if let models = models, !models.isEmpty {
                     CopilotModelManager.updateLLMs(models)
                 }
             }
-            await Status.shared.updateAuthStatus(.loggedIn, username: status.user)
             await unwatchAuthStatus()
         } else if status.status == .notAuthorized {
             await Status.shared

@@ -13,6 +13,8 @@ struct VisualEffect: NSViewRepresentable {
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate {
+    private var permissionAlertShown = false
+    
     // Launch modes supported by the app
     enum LaunchMode {
         case chat
@@ -20,11 +22,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if #available(macOS 13.0, *) {
+            checkBackgroundPermissions()
+        }
+        
         let launchMode = determineLaunchMode()
         handleLaunchMode(launchMode)
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if #available(macOS 13.0, *) {
+            checkBackgroundPermissions()
+        }
+        
         let launchMode = determineLaunchMode()
         handleLaunchMode(launchMode)
         return true
@@ -69,6 +79,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             Task {
                 let service = try? getService()
                 try? await service?.openChat()
+            }
+        }
+    }
+    
+    @available(macOS 13.0, *)
+    private func checkBackgroundPermissions() {
+        Task {
+            // Direct check of permission status
+            let launchAgentManager = LaunchAgentManager()
+            let isPermissionGranted = await launchAgentManager.isBackgroundPermissionGranted()
+            
+            if !isPermissionGranted {
+                // Only show alert if permission isn't granted
+                DispatchQueue.main.async {
+                    if !self.permissionAlertShown {
+                        showBackgroundPermissionAlert()
+                        self.permissionAlertShown = true
+                    }
+                }
+            } else {
+                // Permission is granted, reset flag
+                self.permissionAlertShown = false
             }
         }
     }
