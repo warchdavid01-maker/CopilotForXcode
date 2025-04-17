@@ -88,20 +88,8 @@ public final class ChatService: ChatServiceType, ObservableObject {
     
     private func subscribeToWatchedFilesHandler() {
         self.watchedFilesHandler.onWatchedFiles.sink(receiveValue: { [weak self] (request, completion) in
-            guard let self,
-                  request.params!.workspaceUri != "/",
-                  !ProjectContextSkill.isWorkspaceResolved(self.chatTabInfo.workspacePath)
-            else { return }
-            
-            ProjectContextSkill.resolveSkill(
-                request: request,
-                workspacePath: self.chatTabInfo.workspacePath,
-                completion: completion
-            )
-            
-            /// after sync complete files to CLS, start file watcher
+            guard let self, request.params!.workspaceUri != "/" else { return }
             self.startFileChangeWatcher()
-            
         }).store(in: &cancellables)
     }
     
@@ -463,20 +451,17 @@ public final class ChatService: ChatServiceType, ObservableObject {
         
         Task {
             // mark running steps to cancelled
-            if var message = await memory.history.last,
-               message.role == .assistant {
-                message.steps = message.steps.map { step in
-                    return .init(
-                        id: step.id,
-                        title: step.title,
-                        description: step.description,
-                        status: step.status == .running ? .cancelled : step.status,
-                        error: step.error
-                    )
-                }
+            await mutateHistory({ history in
+                guard !history.isEmpty,
+                      let lastIndex = history.indices.last,
+                      history[lastIndex].role == .assistant else { return }
                 
-                await memory.appendMessage(message)
-            }
+                for i in 0..<history[lastIndex].steps.count {
+                    if history[lastIndex].steps[i].status == .running {
+                        history[lastIndex].steps[i].status = .cancelled
+                    }
+                }
+            })
             
             // The message of progress report could change rapidly
             // Directly upsert the last chat message of history here

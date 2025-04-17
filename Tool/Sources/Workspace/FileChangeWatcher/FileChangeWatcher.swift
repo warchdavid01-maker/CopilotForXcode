@@ -33,6 +33,9 @@ public final class BatchingFileChangeWatcher: FileChangeWatcher {
     
     public var paths: [URL] { watchedPaths }
     
+    /// TODO: set a proper value for stdio
+    public static let maxEventPublishSize = 100
+    
     init(
         watchedPaths: [URL],
         changePublisher: @escaping PublisherType,
@@ -140,8 +143,14 @@ public final class BatchingFileChangeWatcher: FileChangeWatcher {
                 }
             }
             
-            let changes = Array(compressedEvent.values)
-            self.pendingEvents.removeAll()
+            let compressedEventArray: [FileEvent] = Array(compressedEvent.values)
+            
+            let changes = Array(compressedEventArray.prefix(BatchingFileChangeWatcher.maxEventPublishSize))
+            if compressedEventArray.count > BatchingFileChangeWatcher.maxEventPublishSize {
+                self.pendingEvents = Array(compressedEventArray[BatchingFileChangeWatcher.maxEventPublishSize..<compressedEventArray.count])
+            } else {
+                self.pendingEvents.removeAll()
+            }
             
             if !changes.isEmpty {
                 DispatchQueue.main.async {

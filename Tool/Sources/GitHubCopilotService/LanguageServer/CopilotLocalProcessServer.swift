@@ -346,7 +346,12 @@ extension CustomJSONRPCLanguageServer {
         callback: @escaping (AnyJSONRPCResponse) -> Void
     ) -> Bool {
         serverRequestPublisher.send((request: request, callback: callback))
-        return false
+        switch request.method {
+        case "copilot/watchedFiles":
+            return true
+        default:
+            return false
+        }
     }
 }
 

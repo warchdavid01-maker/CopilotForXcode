@@ -29,6 +29,7 @@ struct StatusItemView: View {
             case .running:
                 ProgressView()
                     .controlSize(.small)
+                    .frame(width: 16, height: 16)
                     .scaleEffect(0.7)
             case .completed:
                 Image(systemName: "checkmark")

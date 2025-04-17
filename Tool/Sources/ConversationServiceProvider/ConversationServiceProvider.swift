@@ -170,7 +170,7 @@ public struct ConversationProgressStep: Codable, Equatable, Identifiable {
     public let id: String
     public let title: String
     public let description: String?
-    public let status: StepStatus
+    public var status: StepStatus
     public let error: StepError?
     
     public init(id: String, title: String, description: String?, status: StepStatus, error: StepError?) {

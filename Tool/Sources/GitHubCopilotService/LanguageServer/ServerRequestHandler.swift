@@ -6,7 +6,7 @@ import LanguageServerProtocol
 import Logger
 
 protocol ServerRequestHandler {
-    func handleRequest(_ request: AnyJSONRPCRequest, callback: @escaping (AnyJSONRPCResponse) -> Void)
+    func handleRequest(_ request: AnyJSONRPCRequest, workspaceURL: URL, callback: @escaping (AnyJSONRPCResponse) -> Void, service: GitHubCopilotService?)
 }
 
 class ServerRequestHandlerImpl : ServerRequestHandler {
@@ -14,7 +14,7 @@ class ServerRequestHandlerImpl : ServerRequestHandler {
     private let conversationContextHandler: ConversationContextHandler = ConversationContextHandlerImpl.shared
     private let watchedFilesHandler: WatchedFilesHandler = WatchedFilesHandlerImpl.shared
     
-    func handleRequest(_ request: AnyJSONRPCRequest, callback: @escaping (AnyJSONRPCResponse) -> Void) {
+    func handleRequest(_ request: AnyJSONRPCRequest, workspaceURL: URL, callback: @escaping (AnyJSONRPCResponse) -> Void, service: GitHubCopilotService?) {
         let methodName = request.method
         do {
             switch methodName {
@@ -28,7 +28,7 @@ class ServerRequestHandlerImpl : ServerRequestHandler {
             case "copilot/watchedFiles":
                 let params = try JSONEncoder().encode(request.params)
                 let watchedFilesParams = try JSONDecoder().decode(WatchedFilesParams.self, from: params)
-                watchedFilesHandler.handleWatchedFiles(WatchedFilesRequest(id: request.id, method: request.method, params: watchedFilesParams), completion: callback)
+                watchedFilesHandler.handleWatchedFiles(WatchedFilesRequest(id: request.id, method: request.method, params: watchedFilesParams), workspaceURL: workspaceURL, completion: callback, service: service)
                 
             default:
                 break

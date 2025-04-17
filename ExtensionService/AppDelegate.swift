@@ -180,10 +180,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                     .userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
                     app.isUserOfService
                 else { continue }
-                if NSWorkspace.shared.runningApplications.contains(where: \.isUserOfService) {
-                    continue
+                
+                // Check if Xcode is running
+                let isXcodeRunning = NSWorkspace.shared.runningApplications.contains { 
+                    $0.bundleIdentifier == "com.apple.dt.Xcode" 
                 }
-                quit()
+                
+                if !isXcodeRunning {
+                    Logger.client.info("No Xcode instances running, preparing to quit")
+                    quit()
+                }
             }
         }
     }

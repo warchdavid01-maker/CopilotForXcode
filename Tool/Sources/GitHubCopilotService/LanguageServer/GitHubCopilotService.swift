@@ -147,7 +147,7 @@ public class GitHubCopilotBaseService {
         sessionId = UUID().uuidString
     }
 
-    init(projectRootURL: URL) throws {
+    init(projectRootURL: URL, workspaceURL: URL = URL(fileURLWithPath: "/")) throws {
         self.projectRootURL = projectRootURL
         self.sessionId = UUID().uuidString
         let (server, localServer) = try {
@@ -348,14 +348,14 @@ public final class GitHubCopilotService:
         super.init(designatedServer: designatedServer)
     }
 
-    override public init(projectRootURL: URL = URL(fileURLWithPath: "/")) throws {
+    override public init(projectRootURL: URL = URL(fileURLWithPath: "/"), workspaceURL: URL = URL(fileURLWithPath: "/")) throws {
         do {
-            try super.init(projectRootURL: projectRootURL)
+            try super.init(projectRootURL: projectRootURL, workspaceURL: workspaceURL)
             localProcessServer?.notificationPublisher.sink(receiveValue: { [weak self] notification in
                 self?.serverNotificationHandler.handleNotification(notification)
             }).store(in: &cancellables)
             localProcessServer?.serverRequestPublisher.sink(receiveValue: { [weak self] (request, callback) in
-                self?.serverRequestHandler.handleRequest(request, callback: callback)
+                self?.serverRequestHandler.handleRequest(request, workspaceURL: workspaceURL, callback: callback, service: self)
             }).store(in: &cancellables)
             updateStatusInBackground()
 

@@ -49,10 +49,7 @@ public struct WorkspaceFile {
                         // Handle "self:" referece - refers to the containing project directory
                         var workspaceURLCopy = workspaceURL
                         workspaceURLCopy.deleteLastPathComponent()
-                        if !subprojectURLs.contains(workspaceURLCopy) {
-                            subprojectURLs.append(workspaceURLCopy)
-                            continue
-                        }
+                        path = workspaceURLCopy.path
                         
                     } else {
                         // Skip absolute paths such as absolute:/path/to/project

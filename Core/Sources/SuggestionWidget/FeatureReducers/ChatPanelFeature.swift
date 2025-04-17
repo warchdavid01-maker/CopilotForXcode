@@ -513,9 +513,12 @@ public struct ChatPanelFeature {
                 if var existChatWorkspace = state.chatHistory.workspaces[id: chatWorkspace.id] {
                     
                     if var selectedChatTabInfo = chatWorkspace.tabInfo.first(where: { $0.id == chatWorkspace.selectedTabId }) {
-                        // cancel selectedChatTabInfo in chat workspace
-                        selectedChatTabInfo.isSelected = false
+                        // Keep the selection state when restoring
+                        selectedChatTabInfo.isSelected = true
                         chatWorkspace.tabInfo[id: selectedChatTabInfo.id] = selectedChatTabInfo
+                        
+                        // Update the existing workspace's selected tab to match
+                        existChatWorkspace.selectedTabId = selectedChatTabInfo.id
                         
                         // merge tab info
                         existChatWorkspace.tabInfo.append(contentsOf: chatWorkspace.tabInfo)

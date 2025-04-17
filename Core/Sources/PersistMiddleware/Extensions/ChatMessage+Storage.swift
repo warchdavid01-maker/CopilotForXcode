@@ -14,6 +14,29 @@ extension ChatMessage {
         var suggestedTitle: String?
         var errorMessage: String?
         var steps: [ConversationProgressStep]
+
+        // Custom decoder to provide default value for steps
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            content = try container.decode(String.self, forKey: .content)
+            rating = try container.decode(ConversationRating.self, forKey: .rating)
+            references = try container.decode([ConversationReference].self, forKey: .references)
+            followUp = try container.decodeIfPresent(ConversationFollowUp.self, forKey: .followUp)
+            suggestedTitle = try container.decodeIfPresent(String.self, forKey: .suggestedTitle)
+            errorMessage = try container.decodeIfPresent(String.self, forKey: .errorMessage)
+            steps = try container.decodeIfPresent([ConversationProgressStep].self, forKey: .steps) ?? []
+        }
+
+        // Default memberwise init for encoding
+        init(content: String, rating: ConversationRating, references: [ConversationReference], followUp: ConversationFollowUp?, suggestedTitle: String?, errorMessage: String?, steps: [ConversationProgressStep]?) {
+            self.content = content
+            self.rating = rating
+            self.references = references
+            self.followUp = followUp
+            self.suggestedTitle = suggestedTitle
+            self.errorMessage = errorMessage
+            self.steps = steps ?? []
+        }
     }
     
     func toTurnItem() -> TurnItem {
