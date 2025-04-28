@@ -739,6 +739,7 @@ public final class GitHubCopilotService:
         if status.status == .ok || status.status == .maybeOk {
             await Status.shared.updateAuthStatus(.loggedIn, username: status.user)
             if !CopilotModelManager.hasLLMs() {
+                Logger.gitHubCopilot.info("No models found, fetching models...")
                 let models = try? await models()
                 if let models = models, !models.isEmpty {
                     CopilotModelManager.updateLLMs(models)

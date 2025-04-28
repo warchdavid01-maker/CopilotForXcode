@@ -258,10 +258,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func forceAuthStatusCheck() async {
         do {
-            let service = try GitHubCopilotService()
+            let service = try await GitHubCopilotViewModel.shared.getGitHubCopilotAuthService()
             _ = try await service.checkStatus()
-            try await service.shutdown()
-            try await service.exit()
         } catch {
             Logger.service.error("Failed to read auth status: \(error)")
         }

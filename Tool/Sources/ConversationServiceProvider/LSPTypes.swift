@@ -17,6 +17,7 @@ public struct ChatTemplate: Codable, Equatable {
 public enum PromptTemplateScope: String, Codable, Equatable {
     case chatPanel = "chat-panel"
     case editPanel = "edit-panel"
+    case agentPanel = "agent-panel"
     case editor = "editor"
     case inline = "inline"
     case completion = "completion"
@@ -37,11 +38,28 @@ public struct CopilotModel: Codable, Equatable {
     public let modelPolicy: CopilotModelPolicy?
     public let scopes: [PromptTemplateScope]
     public let preview: Bool
+    public let isChatDefault: Bool
+    public let isChatFallback: Bool
+    public let capabilities: CopilotModelCapabilities
+    public let billing: CopilotModelBilling?
 }
 
 public struct CopilotModelPolicy: Codable, Equatable {
     public let state: String
     public let terms: String
+}
+
+public struct CopilotModelCapabilities: Codable, Equatable {
+    public let supports: CopilotModelCapabilitiesSupports
+}
+
+public struct CopilotModelCapabilitiesSupports: Codable, Equatable {
+    public let vision: Bool
+}
+
+public struct CopilotModelBilling: Codable, Equatable {
+    public let isPremium: Bool
+    public let multiplier: Float
 }
 
 // MARK: Conversation Agents

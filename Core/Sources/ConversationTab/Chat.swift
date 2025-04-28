@@ -6,6 +6,7 @@ import Preferences
 import Terminal
 import ConversationServiceProvider
 import Persist
+import GitHubCopilotService
 
 public struct DisplayedChatMessage: Equatable {
     public enum Role: Equatable {
@@ -142,7 +143,7 @@ struct Chat {
                 state.typedMessage = ""
                 
                 let selectedFiles = state.selectedFiles
-                let selectedModelFamily = AppState.shared.getSelectedModelFamily()
+                let selectedModelFamily = AppState.shared.getSelectedModelFamily() ?? CopilotModelManager.getDefaultChatLLM()?.modelFamily
                 return .run { _ in
                     try await service.send(id, content: message, skillSet: skillSet, references: selectedFiles, model: selectedModelFamily)
                 }.cancellable(id: CancelID.sendMessage(self.id))
@@ -152,7 +153,7 @@ struct Chat {
                 let skillSet = state.buildSkillSet()
                 
                 let selectedFiles = state.selectedFiles
-                let selectedModelFamily = AppState.shared.getSelectedModelFamily()
+                let selectedModelFamily = AppState.shared.getSelectedModelFamily() ?? CopilotModelManager.getDefaultChatLLM()?.modelFamily
                 
                 return .run { _ in
                     try await service.send(id, content: message, skillSet: skillSet, references: selectedFiles, model: selectedModelFamily)
