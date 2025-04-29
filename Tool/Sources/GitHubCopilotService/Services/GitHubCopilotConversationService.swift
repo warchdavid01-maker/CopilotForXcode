@@ -16,7 +16,7 @@ public final class GitHubCopilotConversationService: ConversationServiceType {
         
         return try await service.createConversation(request.content,
                                                     workDoneToken: request.workDoneToken,
-                                                    workspaceFolder: workspace.projectURL.path,
+                                                    workspaceFolder: workspace.projectURL.absoluteString,
                                                     doc: nil,
                                                     skills: request.skills,
                                                     ignoredSkills: request.ignoredSkills,
@@ -35,7 +35,7 @@ public final class GitHubCopilotConversationService: ConversationServiceType {
                                             ignoredSkills: request.ignoredSkills,
                                             references: request.references ?? [],
                                             model: request.model,
-                                            workspaceFolder: workspace.projectURL.path)
+                                            workspaceFolder: workspace.projectURL.absoluteString)
     }
     
     public func cancelProgress(_ workDoneToken: String, workspace: WorkspaceInfo) async throws {

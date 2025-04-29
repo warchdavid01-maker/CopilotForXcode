@@ -1,17 +1,14 @@
-### GitHub Copilot for Xcode 0.33.0
+### GitHub Copilot for Xcode 0.34.0
 
 **🚀 Highlights**
 
-* **New Models**: Claude 3.7 Sonnet and GPT 4.5 are now available in the Copilot Chat model selector.
-* **@workspace Context**: Ask questions about your entire codebase by referencing `@workspace` in Copilot Chat.
+* **New Models**: OpenAI GPT-4.1, o3 and o4-mini, Gemini 2.5 Pro are now available in the Copilot Chat model selector.
 
 **💪 Improvements**
 
-* Open Copilot Chat with a single click from the Copilot for Xcode app
-* Clearer instructions for granting background permissions
+* Switched default model to GPT-4.1 for new installations
+* Enhanced model selection interface
 
 **🛠️ Bug Fixes**
 
-* Resolved false alarms for sign-in and free plan limit notifications
-* Improved app launch performance
-* Fixed workspace and context update issues
+* Resolved critical error handling issues

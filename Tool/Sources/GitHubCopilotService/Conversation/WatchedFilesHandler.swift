@@ -15,7 +15,7 @@ public final class WatchedFilesHandlerImpl: WatchedFilesHandler {
     public let onWatchedFiles: PassthroughSubject<(WatchedFilesRequest, (AnyJSONRPCResponse) -> Void), Never> = .init()
     
     public func handleWatchedFiles(_ request: WatchedFilesRequest, workspaceURL: URL, completion: @escaping (AnyJSONRPCResponse) -> Void, service: GitHubCopilotService?) {
-        guard let params = request.params, params.workspaceUri != "/" else { return }
+        guard let params = request.params, params.workspaceFolder.uri != "/" else { return }
 
         let projectURL = WorkspaceXcodeWindowInspector.extractProjectURL(workspaceURL: workspaceURL, documentURL: nil) ?? workspaceURL
         
@@ -28,7 +28,7 @@ public final class WatchedFilesHandlerImpl: WatchedFilesHandler {
         
         let batchSize = BatchingFileChangeWatcher.maxEventPublishSize
         /// only `batchSize`(100) files to complete this event for setup watching workspace in CLS side
-        let jsonResult: JSONValue = .array(files.prefix(batchSize).map { .string($0) })
+        let jsonResult: JSONValue = .array(files.prefix(batchSize).map { .hash(["uri": .string($0)]) })
         let jsonValue: JSONValue = .hash(["files": jsonResult])
         
         completion(AnyJSONRPCResponse(id: request.id, result: jsonValue))
@@ -39,7 +39,7 @@ public final class WatchedFilesHandlerImpl: WatchedFilesHandler {
                     let endIndex = min(startIndex + batchSize, files.count)
                     let batch = Array(files[startIndex..<endIndex])
                     try? await service?.notifyDidChangeWatchedFiles(.init(
-                        workspaceUri: params.workspaceUri,
+                        workspaceUri: params.workspaceFolder.uri,
                         changes: batch.map { .init(uri: $0, type: .created)}
                     ))
                     

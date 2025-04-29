@@ -11,6 +11,7 @@ import XcodeInspector
  */
 public class ProjectContextSkill {
     public static let ID = "project-context"
+    public static let ProgressID = "collect-project-context"
     
     public static var resolvedWorkspace: Set<String> = Set()
     
@@ -33,7 +34,7 @@ public class ProjectContextSkill {
         
         let params = request.params!
         
-        guard params.workspaceUri != "/" else { return }
+        guard params.workspaceFolder.uri != "/" else { return }
         
         /// build workspace URL
         let workspaceURL = URL(fileURLWithPath: workspacePath)
@@ -44,7 +45,7 @@ public class ProjectContextSkill {
         ) ?? workspaceURL
         
         /// ignore invalid resolve request
-        guard projectURL.path == params.workspaceUri else { return }
+        guard projectURL.absoluteString == params.workspaceFolder.uri else { return }
         
         let files = WorkspaceFile.getWatchedFiles(
             workspaceURL: workspaceURL,

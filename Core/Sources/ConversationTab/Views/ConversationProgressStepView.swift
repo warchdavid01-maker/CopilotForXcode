@@ -2,6 +2,7 @@ import SwiftUI
 import ConversationServiceProvider
 import ComposableArchitecture
 import Combine
+import ChatService
 
 struct ProgressStep: View {
     let steps: [ConversationProgressStep]
@@ -33,15 +34,23 @@ struct StatusItemView: View {
                     .scaleEffect(0.7)
             case .completed:
                 Image(systemName: "checkmark")
-                    .foregroundColor(.green.opacity(0.5))
+                    .foregroundColor(.green)
             case .failed:
                 Image(systemName: "xmark.circle")
-                    .foregroundColor(.red.opacity(0.5))
+                    .foregroundColor(.red)
             case .cancelled:
                 Image(systemName: "slash.circle")
-                    .foregroundColor(.gray.opacity(0.5))
+                    .foregroundColor(.gray)
             }
         }
+    }
+    
+    var statusTitle: some View {
+        var title = step.title
+        if step.id == ProjectContextSkill.ProgressID && step.status == .failed {
+            title = step.error?.message ?? step.title
+        }
+        return Text(title)
     }
     
     var body: some View {
@@ -50,7 +59,7 @@ struct StatusItemView: View {
                 statusIcon
                     .frame(width: 16, height: 16)
                 
-                Text(step.title)
+                statusTitle
                     .font(.system(size: chatFontSize))
                     .lineLimit(1)
                 

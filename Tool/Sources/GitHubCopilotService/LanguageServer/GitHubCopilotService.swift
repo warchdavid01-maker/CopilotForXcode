@@ -247,7 +247,7 @@ public class GitHubCopilotBaseService {
                     capabilities: capabilities,
                     trace: .off,
                     workspaceFolders: [WorkspaceFolder(
-                        uri: projectRootURL.path,
+                        uri: projectRootURL.absoluteString,
                         name: projectRootURL.lastPathComponent
                     )]
                 )
@@ -262,6 +262,13 @@ public class GitHubCopilotBaseService {
         let notifications = NotificationCenter.default
             .notifications(named: .gitHubCopilotShouldRefreshEditorInformation)
         Task { [weak self] in
+            if projectRootURL.path != "/" {
+                try? await server.sendNotification(
+                    .workspaceDidChangeWorkspaceFolders(
+                        .init(event: .init(added: [.init(uri: projectRootURL.absoluteString, name: projectRootURL.lastPathComponent)], removed: []))
+                    )
+                )
+            }
             // Send workspace/didChangeConfiguration once after initalize
             _ = try? await server.sendNotification(
                 .workspaceDidChangeConfiguration(

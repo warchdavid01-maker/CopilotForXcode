@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.34.0 - April 29, 2025
+### Added
+- Added support for new models in Chat: OpenAI GPT-4.1, o3 and o4-mini, Gemini 2.5 Pro
+
+### Changed
+- Switched default model to GPT-4.1 for new installations
+- Enhanced model selection interface
+
+### Fixed
+- Resolved critical error handling issues
+
 ## 0.33.0 - April 17, 2025
 ### Added
 - Added support for new models in Chat: Claude 3.7 Sonnet and GPT 4.5

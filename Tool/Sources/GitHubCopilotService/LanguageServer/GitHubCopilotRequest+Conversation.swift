@@ -167,7 +167,7 @@ public typealias ConversationContextRequest = JSONRPCRequest<ConversationContext
 // MARK: Watched Files
 
 public struct WatchedFilesParams: Codable {
-    public var workspaceUri: String
+    public var workspaceFolder: WorkspaceFolder
     public var excludeGitignoredFiles: Bool
     public var excludeIDEIgnoredFiles: Bool
 }

@@ -88,7 +88,7 @@ public final class ChatService: ChatServiceType, ObservableObject {
     
     private func subscribeToWatchedFilesHandler() {
         self.watchedFilesHandler.onWatchedFiles.sink(receiveValue: { [weak self] (request, completion) in
-            guard let self, request.params!.workspaceUri != "/" else { return }
+            guard let self, request.params!.workspaceFolder.uri != "/" else { return }
             self.startFileChangeWatcher()
         }).store(in: &cancellables)
     }
