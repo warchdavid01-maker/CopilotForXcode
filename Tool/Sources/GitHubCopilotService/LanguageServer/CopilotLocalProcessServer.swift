@@ -346,11 +346,17 @@ extension CustomJSONRPCLanguageServer {
         callback: @escaping (AnyJSONRPCResponse) -> Void
     ) -> Bool {
         serverRequestPublisher.send((request: request, callback: callback))
-        switch request.method {
+
+        let methodName = request.method
+        switch methodName {
+        case "conversation/invokeClientTool":
+            return true
+        case "conversation/context":
+            return true
         case "copilot/watchedFiles":
             return true
         default:
-            return false
+            return false // delegate the default handling to the server
         }
     }
 }

@@ -17,11 +17,7 @@ public class CopilotModelManager {
     public static func getAvailableLLMs() -> [CopilotModel] {
         return availableLLMs
     }
-    
-    public static func getDefaultChatLLM() -> CopilotModel? {
-        return availableLLMs.first(where: { $0.isChatDefault })
-    }
-    
+
     public static func hasLLMs() -> Bool {
         return !availableLLMs.isEmpty
     }

@@ -90,7 +90,7 @@ let package = Package(
 
         .target(name: "Preferences", dependencies: ["Configs"]),
 
-        .target(name: "Terminal"),
+        .target(name: "Terminal", dependencies: ["Logger"]),
 
         .target(name: "Logger"),
 
@@ -306,6 +306,7 @@ let package = Package(
                 "TelemetryServiceProvider",
                 "Status",
                 "SystemUtils",
+                "Workspace",
                 .product(name: "LanguageServerProtocol", package: "LanguageServerProtocol"),
                 .product(name: "CopilotForXcodeKit", package: "CopilotForXcodeKit"),
             ]

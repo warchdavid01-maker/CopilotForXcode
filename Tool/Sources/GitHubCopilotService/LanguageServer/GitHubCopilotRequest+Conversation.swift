@@ -10,11 +10,6 @@ enum ConversationSource: String, Codable {
     case panel, inline
 }
 
-public struct Doc: Codable {
-    var position: Position?
-    var uri: String
-}
-
 public struct Reference: Codable, Equatable, Hashable {
     public var type: String = "file"
     public let uri: String
@@ -29,13 +24,15 @@ struct ConversationCreateParams: Codable {
     var workDoneToken: String
     var turns: [ConversationTurn]
     var capabilities: Capabilities
-    var doc: Doc?
+    var textDocument: Doc?
     var references: [Reference]?
     var computeSuggestions: Bool?
     var source: ConversationSource?
     var workspaceFolder: String?
+    var workspaceFolders: [WorkspaceFolder]?
     var ignoredSkills: [String]?
     var model: String?
+    var chatMode: String?
 
     struct Capabilities: Codable {
         var skills: [String]
@@ -69,6 +66,7 @@ public struct ConversationProgressReport: BaseConversationProgress {
     public let reply: String?
     public let references: [Reference]?
     public let steps: [ConversationProgressStep]?
+    public let editAgentRounds: [AgentRound]?
 }
 
 public struct ConversationProgressEnd: BaseConversationProgress {
@@ -133,11 +131,13 @@ struct TurnCreateParams: Codable {
     var workDoneToken: String
     var conversationId: String
     var message: String
-    var doc: Doc?
+    var textDocument: Doc?
     var ignoredSkills: [String]?
     var references: [Reference]?
     var model: String?
     var workspaceFolder: String?
+    var workspaceFolders: [WorkspaceFolder]?
+    var chatMode: String?
 }
 
 // MARK: Copy

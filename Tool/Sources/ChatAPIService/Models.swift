@@ -104,6 +104,8 @@ public struct ChatMessage: Equatable, Codable {
     /// The steps of conversation progress
     public var steps: [ConversationProgressStep]
     
+    public var editAgentRounds: [AgentRound]
+    
     /// The timestamp of the message.
     public var createdAt: Date
     public var updatedAt: Date
@@ -120,6 +122,7 @@ public struct ChatMessage: Equatable, Codable {
         errorMessage: String? = nil,
         rating: ConversationRating = .unrated,
         steps: [ConversationProgressStep] = [],
+        editAgentRounds: [AgentRound] = [],
         createdAt: Date? = nil,
         updatedAt: Date? = nil
     ) {
@@ -134,6 +137,7 @@ public struct ChatMessage: Equatable, Codable {
         self.errorMessage = errorMessage
         self.rating = rating
         self.steps = steps
+        self.editAgentRounds = editAgentRounds
 
         let now = Date.now
         self.createdAt = createdAt ?? now

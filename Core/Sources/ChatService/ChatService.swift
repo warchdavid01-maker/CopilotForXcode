@@ -13,14 +13,54 @@ import ChatTab
 import Logger
 import Workspace
 import XcodeInspector
+import OrderedCollections
 
 public protocol ChatServiceType {
     var memory: ContextAwareAutoManagedChatMemory { get set }
-    func send(_ id: String, content: String, skillSet: [ConversationSkill], references: [FileReference], model: String?) async throws
+    func send(_ id: String, content: String, skillSet: [ConversationSkill], references: [FileReference], model: String?, agentMode: Bool) async throws
     func stopReceivingMessage() async
     func upvote(_ id: String, _ rating: ConversationRating) async
     func downvote(_ id: String, _ rating: ConversationRating) async
     func copyCode(_ id: String) async
+}
+
+struct ToolCallRequest {
+    let requestId: JSONId
+    let turnId: String
+    let roundId: Int
+    let toolCallId: String
+    let completion: (AnyJSONRPCResponse) -> Void
+}
+
+public struct FileEdit: Equatable {
+    
+    public enum Status: String {
+        case none = "none"
+        case kept = "kept"
+        case undone = "undone"
+    }
+    
+    public let fileURL: URL
+    public let originalContent: String
+    public var modifiedContent: String
+    public var status: Status
+    
+    /// Different toolName, the different undo logic. Like `insert_edit_into_file` and `create_file`
+    public var toolName: ToolName
+    
+    public init(
+        fileURL: URL,
+        originalContent: String,
+        modifiedContent: String,
+        status: Status = .none,
+        toolName: ToolName
+    ) {
+        self.fileURL = fileURL
+        self.originalContent = originalContent
+        self.modifiedContent = modifiedContent
+        self.status = status
+        self.toolName = toolName
+    }
 }
 
 public final class ChatService: ChatServiceType, ObservableObject {
@@ -28,7 +68,8 @@ public final class ChatService: ChatServiceType, ObservableObject {
     public var memory: ContextAwareAutoManagedChatMemory
     @Published public internal(set) var chatHistory: [ChatMessage] = []
     @Published public internal(set) var isReceivingMessage = false
-    private let chatTabInfo: ChatTabInfo
+    @Published public internal(set) var fileEditMap: OrderedDictionary<URL, FileEdit> = [:]
+    public let chatTabInfo: ChatTabInfo
     private let conversationProvider: ConversationServiceProvider?
     private let conversationProgressHandler: ConversationProgressHandler
     private let conversationContextHandler: ConversationContextHandler = ConversationContextHandlerImpl.shared
@@ -39,6 +80,7 @@ public final class ChatService: ChatServiceType, ObservableObject {
     private(set) public var conversationId: String?
     private var skillSet: [ConversationSkill] = []
     private var isRestored: Bool = false
+    private var pendingToolCallRequests: [String: ToolCallRequest] = [:]
     init(provider: any ConversationServiceProvider,
          memory: ContextAwareAutoManagedChatMemory = ContextAwareAutoManagedChatMemory(),
          conversationProgressHandler: ConversationProgressHandler = ConversationProgressHandlerImpl.shared,
@@ -52,6 +94,7 @@ public final class ChatService: ChatServiceType, ObservableObject {
         subscribeToNotifications()
         subscribeToConversationContextRequest()
         subscribeToWatchedFilesHandler()
+        subscribeToClientToolInvokeEvent()
     }
     
     private func subscribeToNotifications() {
@@ -92,7 +135,68 @@ public final class ChatService: ChatServiceType, ObservableObject {
             self.startFileChangeWatcher()
         }).store(in: &cancellables)
     }
+
+    private func subscribeToClientToolInvokeEvent() {
+        ClientToolHandlerImpl.shared.onClientToolInvokeEvent.sink(receiveValue: { [weak self] (request, completion) in
+            guard let params = request.params, params.conversationId == self?.conversationId else { return }
+            guard let copilotTool = CopilotToolRegistry.shared.getTool(name: params.name) else {
+                completion(AnyJSONRPCResponse(id: request.id,
+                                              result: JSONValue.array([
+                                                  JSONValue.null,
+                                                  JSONValue.hash(
+                                                    [
+                                                        "code": .number(-32601),
+                                                        "message": .string("Tool function not found")
+                                                    ])
+                                              ])
+                                             )
+                )
+                return
+            }
+
+            let completed = copilotTool.invokeTool(request, completion: completion, chatHistoryUpdater: self?.appendToolCallHistory, contextProvider: self)
+            if !completed {
+                self?.pendingToolCallRequests[params.toolCallId] = ToolCallRequest(
+                    requestId: request.id,
+                    turnId: params.turnId,
+                    roundId: params.roundId,
+                    toolCallId: params.toolCallId,
+                    completion: completion)
+            }
+        }).store(in: &cancellables)
+    }
+
+    private func appendToolCallHistory(turnId: String, editAgentRounds: [AgentRound]) {
+        let chatTabId = self.chatTabInfo.id
+        Task {
+            let message = ChatMessage(
+                id: turnId,
+                chatTabID: chatTabId,
+                clsTurnID: turnId,
+                role: .assistant,
+                content: "",
+                references: [],
+                steps: [],
+                editAgentRounds: editAgentRounds
+            )
+
+            await self.memory.appendMessage(message)
+        }
+    }
     
+    public func updateFileEdits(by fileEdit: FileEdit) {
+        if let existingFileEdit = self.fileEditMap[fileEdit.fileURL] {
+            self.fileEditMap[fileEdit.fileURL] = .init(
+                fileURL: fileEdit.fileURL,
+                originalContent: existingFileEdit.originalContent,
+                modifiedContent: fileEdit.modifiedContent,
+                toolName: existingFileEdit.toolName
+            )
+        } else {
+            self.fileEditMap[fileEdit.fileURL] = fileEdit
+        }
+    }
+
     public static func service(for chatTabInfo: ChatTabInfo) -> ChatService {
         let provider = BuiltinExtensionConversationServiceProvider(
             extension: GitHubCopilotExtension.self
@@ -113,8 +217,81 @@ public final class ChatService: ChatServiceType, ObservableObject {
         
         self.isRestored = true
     }
-    
-    public func send(_ id: String, content: String, skillSet: Array<ConversationSkill>, references: Array<FileReference>, model: String? = nil) async throws {
+
+    public func updateToolCallStatus(toolCallId: String, status: AgentToolCall.ToolCallStatus, payload: Any? = nil) {
+        if status == .cancelled {
+            resetOngoingRequest()
+            return
+        }
+
+        // Send the tool call result back to the server
+        if let toolCallRequest = self.pendingToolCallRequests[toolCallId], status == .completed, let result = payload {
+            self.pendingToolCallRequests.removeValue(forKey: toolCallId)
+            let toolResult = LanguageModelToolResult(content: [
+                .init(value: result)
+            ])
+            let jsonResult = try? JSONEncoder().encode(toolResult)
+            let jsonValue = (try? JSONDecoder().decode(JSONValue.self, from: jsonResult ?? Data())) ?? JSONValue.null
+            toolCallRequest.completion(
+                AnyJSONRPCResponse(
+                    id: toolCallRequest.requestId,
+                    result: JSONValue.array([
+                        jsonValue,
+                        JSONValue.null
+                    ])
+                )
+            )
+        }
+
+        // Update the tool call status in the chat history
+        Task {
+            guard let lastMessage = await memory.history.last, lastMessage.role == .assistant else {
+                return
+            }
+
+            var updatedAgentRounds: [AgentRound] = []
+            for i in 0..<lastMessage.editAgentRounds.count {
+                if lastMessage.editAgentRounds[i].toolCalls == nil {
+                    continue
+                }
+                for j in 0..<lastMessage.editAgentRounds[i].toolCalls!.count {
+                    if lastMessage.editAgentRounds[i].toolCalls![j].id == toolCallId {
+                        updatedAgentRounds.append(
+                            AgentRound(roundId: lastMessage.editAgentRounds[i].roundId,
+                                       reply: "",
+                                       toolCalls: [
+                                        AgentToolCall(id: toolCallId,
+                                                      name: lastMessage.editAgentRounds[i].toolCalls![j].name,
+                                                      status: status)
+                                       ]
+                                      )
+                        )
+                        break
+                    }
+                }
+                if !updatedAgentRounds.isEmpty {
+                    break
+                }
+            }
+
+            if !updatedAgentRounds.isEmpty {
+                let message = ChatMessage(
+                    id: lastMessage.id,
+                    chatTabID: lastMessage.chatTabID,
+                    clsTurnID: lastMessage.clsTurnID,
+                    role: .assistant,
+                    content: "",
+                    references: [],
+                    steps: [],
+                    editAgentRounds: updatedAgentRounds
+                )
+
+                await self.memory.appendMessage(message)
+            }
+        }
+    }
+
+    public func send(_ id: String, content: String, skillSet: Array<ConversationSkill>, references: Array<FileReference>, model: String? = nil, agentMode: Bool = false) async throws {
         guard activeRequestId == nil else { return }
         let workDoneToken = UUID().uuidString
         activeRequestId = workDoneToken
@@ -127,6 +304,9 @@ public final class ChatService: ChatServiceType, ObservableObject {
             references: references.toConversationReferences()
         )
         await memory.appendMessage(chatMessage)
+        
+        // reset file edits
+        self.resetFileEdits()
         
         // persist
         saveChatMessageToStorage(chatMessage)
@@ -157,6 +337,8 @@ public final class ChatService: ChatServiceType, ObservableObject {
         let ignoredSkills: [String] = skillCapabilities.filter {
             !supportedSkills.contains($0)
         }
+        let currentEditorSkill = skillSet.first { $0.id == CurrentEditorSkill.ID }
+        let activeDoc: Doc? = (currentEditorSkill as? CurrentEditorSkill).map { Doc(uri: $0.currentFile.url.absoluteString) }
         
         /// replace the `@workspace` to `@project`
         let newContent = replaceFirstWord(in: content, from: "@workspace", to: "@project")
@@ -164,10 +346,12 @@ public final class ChatService: ChatServiceType, ObservableObject {
         let request = ConversationRequest(workDoneToken: workDoneToken,
                                           content: newContent,
                                           workspaceFolder: "",
+                                          activeDoc: activeDoc,
                                           skills: skillCapabilities,
                                           ignoredSkills: ignoredSkills,
                                           references: references,
-                                          model: model)
+                                          model: model,
+                                          agentMode: agentMode)
         self.skillSet = skillSet
         try await send(request)
     }
@@ -339,6 +523,7 @@ public final class ChatService: ChatServiceType, ObservableObject {
         var content = ""
         var references: [ConversationReference] = []
         var steps: [ConversationProgressStep] = []
+        var editAgentRounds: [AgentRound] = []
 
         if let reply = progress.reply {
             content = reply
@@ -352,7 +537,11 @@ public final class ChatService: ChatServiceType, ObservableObject {
             steps = progressSteps
         }
         
-        if content.isEmpty && references.isEmpty && steps.isEmpty {
+        if let progressAgentRounds = progress.editAgentRounds, !progressAgentRounds.isEmpty {
+            editAgentRounds = progressAgentRounds
+        }
+        
+        if content.isEmpty && references.isEmpty && steps.isEmpty && editAgentRounds.isEmpty {
             return
         }
         
@@ -360,6 +549,7 @@ public final class ChatService: ChatServiceType, ObservableObject {
         let messageContent = content
         let messageReferences = references
         let messageSteps = steps
+        let messageAgentRounds = editAgentRounds
 
         Task {
             let message = ChatMessage(
@@ -369,7 +559,8 @@ public final class ChatService: ChatServiceType, ObservableObject {
                 role: .assistant,
                 content: messageContent,
                 references: messageReferences,
-                steps: messageSteps
+                steps: messageSteps,
+                editAgentRounds: messageAgentRounds
             )
 
             // will persist in resetOngoingRequest()
@@ -447,7 +638,22 @@ public final class ChatService: ChatServiceType, ObservableObject {
     private func resetOngoingRequest() {
         activeRequestId = nil
         isReceivingMessage = false
-        
+
+        // cancel all pending tool call requests
+        for (_, request) in pendingToolCallRequests {
+            pendingToolCallRequests.removeValue(forKey: request.toolCallId)
+            request.completion(AnyJSONRPCResponse(id: request.requestId,
+                                                    result: JSONValue.array([
+                                                        JSONValue.null,
+                                                        JSONValue.hash(
+                                                            [
+                                                                "code": .number(-32800), // client cancelled
+                                                                "message": .string("The client cancelled the tool call request \(request.toolCallId)")
+                                                            ])
+                                                    ])
+                                                 )
+                               )
+        }
         
         Task {
             // mark running steps to cancelled
@@ -461,8 +667,21 @@ public final class ChatService: ChatServiceType, ObservableObject {
                         history[lastIndex].steps[i].status = .cancelled
                     }
                 }
+                
+                for i in 0..<history[lastIndex].editAgentRounds.count {
+                    if history[lastIndex].editAgentRounds[i].toolCalls == nil {
+                        continue
+                    }
+
+                    for j in 0..<history[lastIndex].editAgentRounds[i].toolCalls!.count {
+                        if history[lastIndex].editAgentRounds[i].toolCalls![j].status == .running
+                            || history[lastIndex].editAgentRounds[i].toolCalls![j].status == .waitForConfirmation {
+                            history[lastIndex].editAgentRounds[i].toolCalls![j].status = .cancelled
+                        }
+                    }
+                }
             })
-            
+
             // The message of progress report could change rapidly
             // Directly upsert the last chat message of history here
             // Possible repeat upsert, but no harm.
@@ -497,6 +716,39 @@ public final class ChatService: ChatServiceType, ObservableObject {
             resetOngoingRequest()
             throw error
         }
+    }
+    
+    // MARK: - File Edit
+    public func undoFileEdit(for fileURL: URL) throws {
+        guard let fileEdit = self.fileEditMap[fileURL],
+              fileEdit.status == .none
+        else { return }
+        
+        switch fileEdit.toolName {
+        case .insertEditIntoFile:
+            try InsertEditIntoFileTool.applyEdit(for: fileURL, content: fileEdit.originalContent, contextProvider: self)
+        case .createFile:
+            try CreateFileTool.undo(for: fileURL)
+        default:
+            return
+        }
+        
+        self.fileEditMap[fileURL]!.status = .undone
+    }
+    
+    public func keepFileEdit(for fileURL: URL) {
+        guard let fileEdit = self.fileEditMap[fileURL], fileEdit.status == .none
+        else { return }
+        self.fileEditMap[fileURL]!.status = .kept
+    }
+    
+    public func resetFileEdits() {
+        self.fileEditMap = [:]
+    }
+    
+    public func discardFileEdit(for fileURL: URL) throws {
+        try self.undoFileEdit(for: fileURL)
+        self.fileEditMap.removeValue(forKey: fileURL)
     }
 }
 
@@ -661,3 +913,4 @@ extension [ChatMessage] {
         return turns
     }
 }
+

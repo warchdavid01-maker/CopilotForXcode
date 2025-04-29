@@ -7,6 +7,8 @@ public let HostAppURL = locateHostBundleURL(url: Bundle.main.bundleURL)
 public extension Notification.Name {
     static let openSettingsWindowRequest = Notification
         .Name("com.github.CopilotForXcode.OpenSettingsWindowRequest")
+    static let openMCPSettingsWindowRequest = Notification
+        .Name("com.github.CopilotForXcode.OpenMCPSettingsWindowRequest")
 }
 
 public enum GitHubCopilotForXcodeSettingsLaunchError: Error, LocalizedError {
@@ -49,6 +51,26 @@ public func launchHostAppSettings() throws {
     } else {
         // If app is not running, launch it with the settings flag
         try launchHostAppWithArgs(args: ["--settings"])
+    }
+}
+
+public func launchHostAppMCPSettings() throws {
+    // Try the AppleScript approach first, but only if app is already running
+    if let hostApp = getRunningHostApp() {
+        let activated = hostApp.activate(options: [.activateIgnoringOtherApps])
+        Logger.ui.info("\(hostAppName()) activated: \(activated)")
+
+        _ = tryLaunchWithAppleScript()
+        
+        DistributedNotificationCenter.default().postNotificationName(
+            .openMCPSettingsWindowRequest,
+            object: nil
+        )
+        Logger.ui.info("\(hostAppName()) MCP settings notification sent after activation")
+        return
+    } else {
+        // If app is not running, launch it with the settings flag
+        try launchHostAppWithArgs(args: ["--mcp"])
     }
 }
 

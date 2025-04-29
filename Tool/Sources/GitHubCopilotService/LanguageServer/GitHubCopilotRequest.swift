@@ -83,9 +83,21 @@ public func editorConfiguration() -> JSONValue {
         return .hash([ "uri": .string(enterpriseURI) ])
     }
 
+    var mcp: JSONValue? {
+        let mcpConfig = UserDefaults.shared.value(for: \.gitHubCopilotMCPConfig)
+        return JSONValue.string(mcpConfig)
+    }
+    
     var d: [String: JSONValue] = [:]
     if let http { d["http"] = http }
     if let authProvider { d["github-enterprise"] = authProvider }
+    if let mcp { 
+        var github: [String: JSONValue] = [:]
+        var copilot: [String: JSONValue] = [:]
+        copilot["mcp"] = mcp
+        github["copilot"] = .hash(copilot)
+        d["github"] = .hash(github)
+    }
     return .hash(d)
 }
 
@@ -364,6 +376,18 @@ enum GitHubCopilotRequest {
 
         var request: ClientRequest {
             .custom("conversation/agents", .hash([:]))
+        }
+    }
+
+    struct RegisterTools: GitHubCopilotRequestType {
+        struct Response: Codable {}
+
+        var params: RegisterToolsParams
+
+        var request: ClientRequest {
+            let data = (try? JSONEncoder().encode(params)) ?? Data()
+            let dict = (try? JSONDecoder().decode(JSONValue.self, from: data)) ?? .hash([:])
+            return .custom("conversation/registerTools", dict)
         }
     }
 

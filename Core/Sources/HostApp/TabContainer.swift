@@ -13,16 +13,24 @@ public struct TabContainer: View {
     let store: StoreOf<HostApp>
     @ObservedObject var toastController: ToastController
     @State private var tabBarItems = [TabBarItem]()
-    @State var tag: Int = 0
+    @Binding var tag: Int
 
     public init() {
         toastController = ToastControllerDependencyKey.liveValue
         store = hostAppStore
+        _tag = Binding(
+            get: { hostAppStore.state.activeTabIndex },
+            set: { hostAppStore.send(.setActiveTab($0)) }
+        )
     }
 
     init(store: StoreOf<HostApp>, toastController: ToastController) {
         self.store = store
         self.toastController = toastController
+        _tag = Binding(
+            get: { store.state.activeTabIndex },
+            set: { store.send(.setActiveTab($0)) }
+        )
     }
 
     public var body: some View {
@@ -39,9 +47,14 @@ public struct TabContainer: View {
                             isSystemImage: false
                         )
                     AdvancedSettings().tabBarItem(
-                        tag: 2,
+                        tag: 1,
                         title: "Advanced",
                         image: "gearshape.2.fill"
+                    )
+                    MCPConfigView().tabBarItem(
+                        tag: 2,
+                        title: "MCP",
+                        image: "wrench.and.screwdriver.fill"
                     )
                 }
                 .environment(\.tabBarTabTag, tag)

@@ -89,30 +89,36 @@ public struct ConversationRequest {
     public var workDoneToken: String
     public var content: String
     public var workspaceFolder: String
+    public var activeDoc: Doc?
     public var skills: [String]
     public var ignoredSkills: [String]?
     public var references: [FileReference]?
     public var model: String?
     public var turns: [TurnSchema]
+    public var agentMode: Bool = false
 
     public init(
         workDoneToken: String,
         content: String,
         workspaceFolder: String,
+        activeDoc: Doc? = nil,
         skills: [String],
         ignoredSkills: [String]? = nil,
         references: [FileReference]? = nil,
         model: String? = nil,
-        turns: [TurnSchema] = []
+        turns: [TurnSchema] = [],
+        agentMode: Bool = false
     ) {
         self.workDoneToken = workDoneToken
         self.content = content
         self.workspaceFolder = workspaceFolder
+        self.activeDoc = activeDoc
         self.skills = skills
         self.ignoredSkills = ignoredSkills
         self.references = references
         self.model = model
         self.turns = turns
+        self.agentMode = agentMode
     }
 }
 
@@ -189,5 +195,39 @@ public struct DidChangeWatchedFilesEvent: Codable {
     public init(workspaceUri: String, changes: [FileEvent]) {
         self.workspaceUri = workspaceUri
         self.changes = changes
+    }
+}
+
+public struct AgentRound: Codable, Equatable {
+    public let roundId: Int
+    public var reply: String
+    public var toolCalls: [AgentToolCall]?
+    
+    public init(roundId: Int, reply: String, toolCalls: [AgentToolCall]? = []) {
+        self.roundId = roundId
+        self.reply = reply
+        self.toolCalls = toolCalls
+    }
+}
+
+public struct AgentToolCall: Codable, Equatable, Identifiable {
+    public let id: String
+    public let name: String
+    public var progressMessage: String?
+    public var status: ToolCallStatus
+    public var error: String?
+    public var invokeParams: InvokeClientToolParams?
+    
+    public enum ToolCallStatus: String, Codable {
+        case waitForConfirmation, running, completed, error, cancelled
+    }
+
+    public init(id: String, name: String, progressMessage: String? = nil, status: ToolCallStatus, error: String? = nil, invokeParams: InvokeClientToolParams? = nil) {
+        self.id = id
+        self.name = name
+        self.progressMessage = progressMessage
+        self.status = status
+        self.error = error
+        self.invokeParams = invokeParams
     }
 }

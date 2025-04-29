@@ -1,6 +1,7 @@
 import Foundation
 import Logger
 import ConversationServiceProvider
+import CopilotForXcodeKit
 
 public let supportedFileExtensions: Set<String> = ["swift", "m", "mm", "h", "cpp", "c", "js", "py", "rb", "java", "applescript", "scpt", "plist", "entitlements", "md", "json", "xml", "txt", "yaml", "yml"]
 public let skipPatterns: [String] = [
@@ -14,6 +15,10 @@ public let skipPatterns: [String] = [
     "bower_components"
 ]
 
+public struct ProjectInfo {
+    public let uri: String
+    public let name: String
+}
 
 public struct WorkspaceFile {
     
@@ -91,7 +96,31 @@ public struct WorkspaceFile {
         }
         return false
     }
-    
+
+    public static func getProjects(workspace: WorkspaceInfo) -> [ProjectInfo] {
+        var subprojects: [ProjectInfo] = []
+        if isXCWorkspace(workspace.workspaceURL) {
+            subprojects = getSubprojectURLs(in: workspace.workspaceURL).map( { projectURL in
+                ProjectInfo(uri: projectURL.absoluteString, name: getDisplayNameOfXcodeWorkspace(url: projectURL))
+            })
+        } else {
+            subprojects.append(ProjectInfo(uri: workspace.projectURL.absoluteString, name: getDisplayNameOfXcodeWorkspace(url: workspace.projectURL)))
+        }
+        return subprojects
+    }
+
+    public static func getDisplayNameOfXcodeWorkspace(url: URL) -> String {
+        var name = url.lastPathComponent
+        let suffixes = [".xcworkspace", ".xcodeproj", ".playground"]
+        for suffix in suffixes {
+            if name.hasSuffix(suffix) {
+                name = String(name.dropLast(suffix.count))
+                break
+            }
+        }
+        return name
+    }
+
     public static func getFilesInActiveWorkspace(
         workspaceURL: URL,
         workspaceRootURL: URL,

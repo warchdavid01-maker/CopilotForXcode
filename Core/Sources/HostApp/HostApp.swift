@@ -12,11 +12,13 @@ public struct HostApp {
     @ObservableState
     public struct State: Equatable {
         var general = General.State()
+        public var activeTabIndex: Int = 0
     }
 
     public enum Action: Equatable {
         case appear
         case general(General.Action)
+        case setActiveTab(Int)
     }
 
     @Dependency(\.toast) var toast
@@ -30,12 +32,16 @@ public struct HostApp {
             General()
         }
 
-        Reduce { _, action in
+        Reduce { state, action in
             switch action {
             case .appear:
                 return .none
 
             case .general:
+                return .none
+
+            case .setActiveTab(let index):
+                state.activeTabIndex = index
                 return .none
             }
         }
@@ -66,5 +72,3 @@ extension DependencyValues {
         set { self[UserDefaultsDependencyKey.self] = newValue }
     }
 }
-
-

@@ -178,7 +178,8 @@ let package = Package(
                     .product(name: "AXHelper", package: "Tool"),
                     .product(name: "ConversationServiceProvider", package: "Tool"),
                     .product(name: "GitHubCopilotService", package: "Tool"),
-                    .product(name: "Workspace", package: "Tool")
+                    .product(name: "Workspace", package: "Tool"),
+                    .product(name: "Terminal", package: "Tool")
                 ]),
             .testTarget(
                 name: "ChatServiceTests",
@@ -198,7 +199,8 @@ let package = Package(
                     .product(name: "MarkdownUI", package: "swift-markdown-ui"),
                     .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
                     .product(name: "SwiftUIFlowLayout", package: "swiftui-flow-layout"),
-                    .product(name: "Persist", package: "Tool")
+                    .product(name: "Persist", package: "Tool"),
+                    .product(name: "Terminal", package: "Tool")
                 ]
             ),
         

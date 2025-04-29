@@ -19,6 +19,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     enum LaunchMode {
         case chat
         case settings
+        case mcp
     }
     
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -46,6 +47,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let launchArgs = CommandLine.arguments
         if launchArgs.contains("--settings") {
             return .settings
+        } else if launchArgs.contains("--mcp") {
+            return .mcp
         } else {
             return .chat
         }
@@ -55,6 +58,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         switch mode {
         case .settings:
             openSettings()
+        case .mcp:
+            openMCPSettings()
         case .chat:
             openChat()
         }
@@ -62,15 +67,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     private func openSettings() {
         DispatchQueue.main.async {
-            NSApp.activate(ignoringOtherApps: true)
-            if #available(macOS 14.0, *) {
-                let environment = SettingsEnvironment()
-                environment.open()
-            } else if #available(macOS 13.0, *) {
-                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-            } else {
-                NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
-            }
+            activateAndOpenSettings()
         }
     }
     
@@ -80,6 +77,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 let service = try? getService()
                 try? await service?.openChat()
             }
+        }
+    }
+    
+    private func openMCPSettings() {
+        DispatchQueue.main.async {
+            activateAndOpenSettings()
+            hostAppStore.send(.setActiveTab(2))
         }
     }
     
@@ -171,15 +175,18 @@ struct CopilotForXcodeApp: App {
             queue: .main
         ) { _ in
             DispatchQueue.main.async {
-                NSApp.activate(ignoringOtherApps: true)
-                if #available(macOS 14.0, *) {
-                    let environment = SettingsEnvironment()
-                    environment.open()
-                } else if #available(macOS 13.0, *) {
-                    NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-                } else {
-                    NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
-                }
+                activateAndOpenSettings()
+            }
+        }
+        
+        DistributedNotificationCenter.default().addObserver(
+            forName: .openMCPSettingsWindowRequest,
+            object: nil,
+            queue: .main
+        ) { _ in
+            DispatchQueue.main.async {
+                activateAndOpenSettings()
+                hostAppStore.send(.setActiveTab(2))
             }
         }
     }
@@ -194,6 +201,19 @@ struct CopilotForXcodeApp: App {
                     checkerDelegate: AppUpdateCheckerDelegate()
                 ))
         }
+    }
+}
+
+@MainActor 
+func activateAndOpenSettings() {
+    NSApp.activate(ignoringOtherApps: true)
+    if #available(macOS 14.0, *) {
+        let environment = SettingsEnvironment()
+        environment.open()
+    } else if #available(macOS 13.0, *) {
+        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+    } else {
+        NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
     }
 }
 

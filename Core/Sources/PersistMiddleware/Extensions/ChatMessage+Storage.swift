@@ -14,6 +14,7 @@ extension ChatMessage {
         var suggestedTitle: String?
         var errorMessage: String?
         var steps: [ConversationProgressStep]
+        var editAgentRounds: [AgentRound]
 
         // Custom decoder to provide default value for steps
         init(from decoder: Decoder) throws {
@@ -25,10 +26,11 @@ extension ChatMessage {
             suggestedTitle = try container.decodeIfPresent(String.self, forKey: .suggestedTitle)
             errorMessage = try container.decodeIfPresent(String.self, forKey: .errorMessage)
             steps = try container.decodeIfPresent([ConversationProgressStep].self, forKey: .steps) ?? []
+            editAgentRounds = try container.decodeIfPresent([AgentRound].self, forKey: .editAgentRounds) ?? []
         }
 
         // Default memberwise init for encoding
-        init(content: String, rating: ConversationRating, references: [ConversationReference], followUp: ConversationFollowUp?, suggestedTitle: String?, errorMessage: String?, steps: [ConversationProgressStep]?) {
+        init(content: String, rating: ConversationRating, references: [ConversationReference], followUp: ConversationFollowUp?, suggestedTitle: String?, errorMessage: String?, steps: [ConversationProgressStep]?, editAgentRounds: [AgentRound]? = nil) {
             self.content = content
             self.rating = rating
             self.references = references
@@ -36,6 +38,7 @@ extension ChatMessage {
             self.suggestedTitle = suggestedTitle
             self.errorMessage = errorMessage
             self.steps = steps ?? []
+            self.editAgentRounds = editAgentRounds ?? []
         }
     }
     
@@ -47,7 +50,8 @@ extension ChatMessage {
             followUp: self.followUp,
             suggestedTitle: self.suggestedTitle,
             errorMessage: self.errorMessage,
-            steps: self.steps
+            steps: self.steps,
+            editAgentRounds: self.editAgentRounds
         )
         
         // TODO: handle exception
@@ -78,6 +82,7 @@ extension ChatMessage {
                     errorMessage: turnItemData.errorMessage,
                     rating: turnItemData.rating,
                     steps: turnItemData.steps,
+                    editAgentRounds: turnItemData.editAgentRounds,
                     createdAt: turnItem.createdAt,
                     updatedAt: turnItem.updatedAt
                 )

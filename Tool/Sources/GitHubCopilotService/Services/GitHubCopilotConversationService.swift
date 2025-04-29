@@ -2,6 +2,8 @@ import CopilotForXcodeKit
 import Foundation
 import ConversationServiceProvider
 import BuiltinExtension
+import Workspace
+import LanguageServerProtocol
 
 public final class GitHubCopilotConversationService: ConversationServiceType {
 
@@ -10,19 +12,28 @@ public final class GitHubCopilotConversationService: ConversationServiceType {
     init(serviceLocator: ServiceLocator) {
         self.serviceLocator = serviceLocator
     }
-    
+
+    private func getWorkspaceFolders(workspace: WorkspaceInfo) -> [WorkspaceFolder] {
+        let projects = WorkspaceFile.getProjects(workspace: workspace)
+        return projects.map { project in
+            WorkspaceFolder(uri: project.uri, name: project.name)
+        }
+    }
+
     public func createConversation(_ request: ConversationRequest, workspace: WorkspaceInfo) async throws {
         guard let service = await serviceLocator.getService(from: workspace) else { return }
         
         return try await service.createConversation(request.content,
                                                     workDoneToken: request.workDoneToken,
                                                     workspaceFolder: workspace.projectURL.absoluteString,
-                                                    doc: nil,
+                                                    workspaceFolders: getWorkspaceFolders(workspace: workspace),
+                                                    activeDoc: request.activeDoc,
                                                     skills: request.skills,
                                                     ignoredSkills: request.ignoredSkills,
                                                     references: request.references ?? [],
                                                     model: request.model,
-                                                    turns: request.turns)
+                                                    turns: request.turns,
+                                                    agentMode: request.agentMode)
     }
     
     public func createTurn(with conversationId: String, request: ConversationRequest, workspace: WorkspaceInfo) async throws {
@@ -31,11 +42,13 @@ public final class GitHubCopilotConversationService: ConversationServiceType {
         return try await service.createTurn(request.content,
                                             workDoneToken: request.workDoneToken,
                                             conversationId: conversationId,
-                                            doc: nil,
+                                            activeDoc: request.activeDoc,
                                             ignoredSkills: request.ignoredSkills,
                                             references: request.references ?? [],
                                             model: request.model,
-                                            workspaceFolder: workspace.projectURL.absoluteString)
+                                            workspaceFolder: workspace.projectURL.absoluteString,
+                                            workspaceFolders: getWorkspaceFolders(workspace: workspace),
+                                            agentMode: request.agentMode)
     }
     
     public func cancelProgress(_ workDoneToken: String, workspace: WorkspaceInfo) async throws {
