@@ -139,6 +139,8 @@ public enum GitHubCopilotError: Error, LocalizedError {
 public extension Notification.Name {
     static let gitHubCopilotShouldRefreshEditorInformation = Notification
         .Name("com.github.CopilotForXcode.GitHubCopilotShouldRefreshEditorInformation")
+    static let gitHubCopilotShouldUpdateMCPToolsStatus = Notification
+            .Name("com.github.CopilotForXcode.gitHubCopilotShouldUpdateMCPToolsStatus")
 }
 
 public class GitHubCopilotBaseService {
@@ -161,7 +163,18 @@ public class GitHubCopilotBaseService {
             var path = SystemUtils.shared.getXcodeBinaryPath()
             var args = ["--stdio"]
             let home = ProcessInfo.processInfo.homePath
-            let systemPath = getTerminalPATH() ?? ProcessInfo.processInfo.environment["PATH"] ?? ""
+
+            var environment: [String: String] = ["HOME": home]
+            let envVarNamesToFetch = ["PATH", "NODE_EXTRA_CA_CERTS", "NODE_TLS_REJECT_UNAUTHORIZED"]
+            let terminalEnvVars = getTerminalEnvironmentVariables(envVarNamesToFetch)
+
+            for varName in envVarNamesToFetch {
+                if let value = terminalEnvVars[varName] ?? ProcessInfo.processInfo.environment[varName] {
+                    environment[varName] = value
+                    Logger.gitHubCopilot.info("Setting env \(varName): \(value)")
+                }
+            }
+
             let versionNumber = JSONValue(
                 stringLiteral: SystemUtils.editorPluginVersion ?? ""
             )
@@ -171,7 +184,7 @@ public class GitHubCopilotBaseService {
             let watchedFiles = JSONValue(
                 booleanLiteral: projectRootURL.path == "/" ? false : true
             )
-            
+
             #if DEBUG
             // Use local language server if set and available
             if let languageServerPath = Bundle.main.infoDictionary?["LANGUAGE_SERVER_PATH"] as? String {
@@ -181,17 +194,21 @@ public class GitHubCopilotBaseService {
                 let nodePath = Bundle.main.infoDictionary?["NODE_PATH"] as? String ?? "node"
                 if FileManager.default.fileExists(atPath: jsPath.path) {
                     path = "/usr/bin/env"
-                    args = [nodePath, "--inspect", jsPath.path, "--stdio"]
+                    if projectRootURL.path == "/" {
+                        args = [nodePath, jsPath.path, "--stdio"]
+                    } else {
+                        args = [nodePath, "--inspect", jsPath.path, "--stdio"]
+                    }
                     Logger.debug.info("Using local language server \(path) \(args)")
                 }
             }
-            // Set debug port and verbose when running in debug
-            let environment: [String: String] = ["HOME": home, "GH_COPILOT_DEBUG_UI_PORT": "8180", "GH_COPILOT_VERBOSE": "true", "PATH": systemPath]
+            // Add debug-specific environment variables
+            environment["GH_COPILOT_DEBUG_UI_PORT"] = "8180"
+            environment["GH_COPILOT_VERBOSE"] = "true"
             #else
-            let environment: [String: String] = if UserDefaults.shared.value(for: \.verboseLoggingEnabled) {
-                ["HOME": home, "GH_COPILOT_VERBOSE": "true", "PATH": systemPath]
-            } else {
-                ["HOME": home, "PATH": systemPath]
+            // Add release-specific environment variables
+            if UserDefaults.shared.value(for: \.verboseLoggingEnabled) {
+                environment["GH_COPILOT_VERBOSE"] = "true"
             }
             #endif
 
@@ -339,38 +356,67 @@ public class GitHubCopilotBaseService {
     }
 }
 
-func getTerminalPATH() -> String? {
+func getTerminalEnvironmentVariables(_ variableNames: [String]) -> [String: String] {
+    var results = [String: String]()
+    guard !variableNames.isEmpty else { return results }
+
+    let userShell: String? = {
+       if let shell = ProcessInfo.processInfo.environment["SHELL"] {
+           return shell
+       }
+        
+        // Check for zsh executable
+        if FileManager.default.fileExists(atPath: "/bin/zsh") {
+            Logger.gitHubCopilot.info("SHELL not found, falling back to /bin/zsh")
+            return "/bin/zsh"
+        }
+        // Check for bash executable
+        if FileManager.default.fileExists(atPath: "/bin/bash") {
+            Logger.gitHubCopilot.info("SHELL not found, falling back to /bin/bash")
+            return "/bin/bash"
+        }
+        
+        Logger.gitHubCopilot.info("Cannot determine user's shell, returning empty environment")
+        return nil // No shell found
+    }()
+    
+    guard let shell = userShell else {
+        return results
+    }
+    
     let process = Process()
     let pipe = Pipe()
-    
-    guard let userShell = ProcessInfo.processInfo.environment["SHELL"] else {
-        print("Cannot determine user's default shell.")
-        return nil
-    }
-    
-    let shellName = URL(fileURLWithPath: userShell).lastPathComponent
-    let command: String
-    
-    if shellName == "zsh" {
-        command = "source ~/.zshrc >/dev/null 2>&1; echo $PATH"
-    } else {
-        command = "source ~/.bashrc >/dev/null 2>&1; echo $PATH"
-    }
-    
-    process.executableURL = URL(fileURLWithPath: userShell)
-    process.arguments = ["-i", "-l", "-c", command]
+
+    process.executableURL = URL(fileURLWithPath: shell)
+    process.arguments = ["-l", "-c", "env"]
     process.standardOutput = pipe
-    
+
     do {
         try process.run()
         process.waitUntilExit()
-        
+
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        return String(data: data, encoding: .utf8)?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let outputString = String(data: data, encoding: .utf8) else {
+            Logger.gitHubCopilot.info("Failed to decode shell output for variables: \(variableNames.joined(separator: ", "))")
+            return results
+        }
+
+        // Process each line of env output
+        for line in outputString.split(separator: "\n") {
+            // Each env line is in the format NAME=VALUE
+            if let idx = line.firstIndex(of: "=") {
+                let key = String(line[..<idx])
+                let value = String(line[line.index(after: idx)...])
+                if variableNames.contains(key) {
+                    results[key] = value
+                }
+            }
+        }
+        
+        return results
     } catch {
-        print("Error: \(error)")
-        return nil
+        Logger.gitHubCopilot.error("Error getting env variables: \(error)")
+        return results
     }
 }
 
@@ -410,6 +456,13 @@ public final class GitHubCopilotService:
 
             GitHubCopilotService.services.append(self)
             
+            setupMCPInformationObserver()
+
+            NotificationCenter.default.post(
+                name: .gitHubCopilotShouldUpdateMCPToolsStatus,
+                object: nil
+            )
+
             Task {
                 await registerClientTools(server: self)
             }
@@ -423,7 +476,30 @@ public final class GitHubCopilotService:
     deinit {
         GitHubCopilotService.services.removeAll { $0 === self }
     }
-
+    
+    // Setup notification observer for refreshing MCP information
+    private func setupMCPInformationObserver() {
+        NotificationCenter.default.addObserver(
+            forName: .gitHubCopilotShouldUpdateMCPToolsStatus,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @GitHubCopilotSuggestionActor [weak self] in
+                guard let self = self else { return }
+                do {
+                    let servers = try await self.updateMCPToolsStatus(
+                        params: CopilotMCPToolManager
+                            .getUpdatedMCPToolsStatusParams()
+                    )
+                    CopilotMCPToolManager.updateMCPTools(servers)
+                } catch {
+                    Logger.gitHubCopilot.error("Failed to send notification: \(error)")
+                }
+                
+            }
+        }
+    }
+    
     @GitHubCopilotSuggestionActor
     public func getCompletions(
         fileURL: URL,
@@ -569,7 +645,8 @@ public final class GitHubCopilotService:
                                               workspaceFolders: workspaceFolders,
                                               ignoredSkills: ignoredSkills,
                                               model: model,
-                                              chatMode: agentMode ? "Agent" : nil)
+                                              chatMode: agentMode ? "Agent" : nil,
+                                              needToolCallConfirmation: true)
         do {
             _ = try await sendRequest(
                 GitHubCopilotRequest.CreateConversation(params: params), timeout: conversationRequestTimeout(agentMode))
@@ -598,7 +675,8 @@ public final class GitHubCopilotService:
                                           model: model,
                                           workspaceFolder: workspaceFolder,
                                           workspaceFolders: workspaceFolders,
-                                          chatMode: agentMode ? "Agent" : nil)
+                                          chatMode: agentMode ? "Agent" : nil,
+                                          needToolCallConfirmation: true)
             _ = try await sendRequest(
                 GitHubCopilotRequest.CreateTurn(params: params), timeout: conversationRequestTimeout(agentMode))
         } catch {
@@ -608,7 +686,7 @@ public final class GitHubCopilotService:
     }
 
     private func conversationRequestTimeout(_ agentMode: Bool) -> TimeInterval {
-        return agentMode ? 300 /* agent mode timeout */ : 90
+        return agentMode ? 86400 /* 24h for agent mode timeout */ : 90
     }
 
     @GitHubCopilotSuggestionActor
@@ -657,6 +735,19 @@ public final class GitHubCopilotService:
             throw error
         }
     }
+    
+    @GitHubCopilotSuggestionActor
+    public func updateMCPToolsStatus(params: UpdateMCPToolsStatusParams) async throws -> [MCPServerToolsCollection] {
+        do {
+            let response = try await sendRequest(
+                GitHubCopilotRequest.UpdatedMCPToolsStatus(params: params)
+            )
+            return response
+        } catch {
+            throw error
+        }
+    }
+    
 
     @GitHubCopilotSuggestionActor
     public func rateConversation(turnId: String, rating: ConversationRating) async throws {

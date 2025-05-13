@@ -271,19 +271,7 @@ extension CustomJSONRPCLanguageServer {
         block: @escaping (Error?) -> Void
     ) -> Bool {
         let methodName = anyNotification.method
-        let debugDescription = {
-            if let params = anyNotification.params {
-                let encoder = JSONEncoder()
-                encoder.outputFormatting = .prettyPrinted
-                if let jsonData = try? encoder.encode(params),
-                   let text = String(data: jsonData, encoding: .utf8)
-                {
-                    return text
-                }
-            }
-            return "N/A"
-        }()
-        
+        let debugDescription = encodeJSONParams(params: anyNotification.params)
         if let method = ServerNotification.Method(rawValue: methodName) {
             switch method {
             case .windowLogMessage:
@@ -321,6 +309,15 @@ extension CustomJSONRPCLanguageServer {
                 notificationPublisher.send(anyNotification)
                 block(nil)
                 return true
+            case "copilot/mcpTools":
+                if let payload = GetAllToolsParams.decode(
+                    fromParams: anyNotification.params
+                ) {
+                    Logger.gitHubCopilot.info("MCPTools: \(payload)")
+                    CopilotMCPToolManager.updateMCPTools(payload.servers)
+                }
+                block(nil)
+                return true
             case "conversation/preconditionsNotification", "statusNotification":
                 // Ignore
                 block(nil)
@@ -345,20 +342,37 @@ extension CustomJSONRPCLanguageServer {
         data: Data,
         callback: @escaping (AnyJSONRPCResponse) -> Void
     ) -> Bool {
+        let methodName = request.method
+        let debugDescription = encodeJSONParams(params: request.params)
         serverRequestPublisher.send((request: request, callback: callback))
 
-        let methodName = request.method
         switch methodName {
         case "conversation/invokeClientTool":
+            return true
+        case "conversation/invokeClientToolConfirmation":
             return true
         case "conversation/context":
             return true
         case "copilot/watchedFiles":
             return true
+        case "window/showMessageRequest":
+            Logger.gitHubCopilot.info("\(methodName): \(debugDescription)")
+            return true
         default:
             return false // delegate the default handling to the server
         }
     }
+}
+
+func encodeJSONParams(params: JSONValue?) -> String {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = .prettyPrinted
+    if let jsonData = try? encoder.encode(params),
+       let text = String(data: jsonData, encoding: .utf8)
+    {
+        return text
+    }
+    return "N/A"
 }
 
 extension CustomJSONRPCLanguageServer {

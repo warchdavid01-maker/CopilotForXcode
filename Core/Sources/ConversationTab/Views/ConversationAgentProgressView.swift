@@ -16,8 +16,10 @@ struct ProgressAgentRound: View {
                 ForEach(rounds, id: \.roundId) { round in
                     VStack(alignment: .leading, spacing: 4) {
                         ThemedMarkdownText(text: round.reply, chat: chat)
-                        ProgressToolCalls(tools: round.toolCalls ?? [], chat: chat)
+                        if let toolCalls = round.toolCalls, !toolCalls.isEmpty {
+                            ProgressToolCalls(tools: toolCalls, chat: chat)
                             .padding(.vertical, 8)
+                        }
                     }
                 }
             }
@@ -36,12 +38,83 @@ struct ProgressToolCalls: View {
                 ForEach(tools) { tool in
                     if tool.name == ToolName.runInTerminal.rawValue && tool.invokeParams != nil {
                         RunInTerminalToolView(tool: tool, chat: chat)
+                    } else if tool.invokeParams != nil && tool.status == .waitForConfirmation {
+                        ToolConfirmationView(tool: tool, chat: chat)
                     } else {
                         ToolStatusItemView(tool: tool)
                     }
                 }
             }
         }
+    }
+}
+
+struct ToolConfirmationView: View {
+    let tool: AgentToolCall
+    let chat: StoreOf<Chat>
+
+    @AppStorage(\.chatFontSize) var chatFontSize
+
+    var body: some View {
+        WithPerceptionTracking {
+            VStack(alignment: .leading, spacing: 8) {
+                GenericToolTitleView(toolStatus: "Run", toolName: tool.name, fontWeight: .semibold)
+
+                ThemedMarkdownText(text: tool.invokeParams?.message ?? "", chat: chat)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                HStack {
+                    Button("Cancel") {
+                        chat.send(.toolCallCancelled(tool.id))
+                    }
+
+                    Button("Continue") {
+                        chat.send(.toolCallAccepted(tool.id))
+                    }
+                    .buttonStyle(BorderedProminentButtonStyle())
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 4)
+            }
+            .padding(8)
+            .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+            )
+        }
+    }
+}
+
+struct GenericToolTitleView: View {
+    var toolStatus: String
+    var toolName: String
+    var fontWeight: Font.Weight = .regular
+
+    @AppStorage(\.chatFontSize) var chatFontSize
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(toolStatus)
+                .textSelection(.enabled)
+                .font(.system(size: chatFontSize, weight: fontWeight))
+                .foregroundStyle(.primary)
+                .background(Color.clear)
+            Text(toolName)
+                .textSelection(.enabled)
+                .font(.system(size: chatFontSize, weight: fontWeight))
+                .foregroundStyle(.primary)
+                .padding(.vertical, 2)
+                .padding(.horizontal, 4)
+                .background(Color("ToolTitleHighlightBgColor"))
+                .cornerRadius(4)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 4)
+                        .inset(by: 0.5)
+                        .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+                )
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -69,13 +142,15 @@ struct ToolStatusItemView: View {
                     .foregroundColor(.gray.opacity(0.5))
             case .waitForConfirmation:
                 EmptyView()
+            case .accepted:
+                EmptyView()
             }
         }
     }
     
     var progressTitleText: some View {
         let message: String = {
-            var msg = tool.progressMessage ?? tool.name
+            var msg = tool.progressMessage ?? ""
             if tool.name == ToolName.createFile.rawValue {
                 if let input = tool.invokeParams?.input, let filePath = input["filePath"]?.value as? String {
                     let fileURL = URL(fileURLWithPath: filePath)
@@ -86,18 +161,22 @@ struct ToolStatusItemView: View {
         }()
 
         return Group {
-            if let attributedString = try? AttributedString(markdown: message) {
-                Text(attributedString)
-                    .environment(\.openURL, OpenURLAction { url in
-                        if url.scheme == "file" || url.isFileURL {
-                            NSWorkspace.shared.open(url)
-                            return .handled
-                        } else {
-                            return .systemAction
-                        }
-                    })
+            if message.isEmpty {
+                GenericToolTitleView(toolStatus: "Running", toolName: tool.name)
             } else {
-                Text(tool.progressMessage ?? tool.name)
+                if let attributedString = try? AttributedString(markdown: message) {
+                    Text(attributedString)
+                        .environment(\.openURL, OpenURLAction { url in
+                            if url.scheme == "file" || url.isFileURL {
+                                NSWorkspace.shared.open(url)
+                                return .handled
+                            } else {
+                                return .systemAction
+                            }
+                        })
+                } else {
+                    Text(message)
+                }
             }
         }
     }

@@ -4,121 +4,29 @@ import Logger
 import SharedUIComponents
 import SwiftUI
 import Toast
-
-extension ButtonStyle where Self == BorderedProminentWhiteButtonStyle {
-    static var borderedProminentWhite: BorderedProminentWhiteButtonStyle {
-        BorderedProminentWhiteButtonStyle()
-    }
-}
-
-struct BorderedProminentWhiteButtonStyle: ButtonStyle {
-    @Environment(\.colorScheme) var colorScheme
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .padding(.horizontal, 4)
-            .padding(.vertical, 2)
-            .foregroundColor(colorScheme == .dark ? .white : .primary)
-            .background(
-                colorScheme == .dark ? Color(red: 0.43, green: 0.43, blue: 0.44) : .white
-            )
-            .cornerRadius(5)
-            .overlay(
-                RoundedRectangle(cornerRadius: 5).stroke(.clear, lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(0.05), radius: 0, x: 0, y: 0)
-            .shadow(color: .black.opacity(0.3), radius: 1.25, x: 0, y: 0.5)
-    }
-}
-
-struct CardGroupBoxStyle: GroupBoxStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        VStack(alignment: .leading, spacing: 11) {
-            configuration.label.foregroundColor(.primary)
-            configuration.content.foregroundColor(.primary)
-        }
-        .padding(8)
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        .background(Color("GroupBoxBackgroundColor"))
-        .cornerRadius(4)
-        .overlay(
-            RoundedRectangle(cornerRadius: 4)
-                .inset(by: 0.5)
-                .stroke(Color("GroupBoxStrokeColor"), lineWidth: 1)
-        )
-    }
-}
+import ConversationServiceProvider
+import GitHubCopilotService
 
 struct MCPConfigView: View {
     @State private var mcpConfig: String = ""
     @Environment(\.toast) var toast
-    @State private var configFilePath: String = ""
+    @State private var configFilePath: String = mcpConfigFilePath
     @State private var isMonitoring: Bool = false
     @State private var lastModificationDate: Date? = nil
     @State private var fileMonitorTask: Task<Void, Error>? = nil
-    @State private var copiedToClipboard: Bool = false
     @Environment(\.colorScheme) var colorScheme
-
-    var exampleConfig: String {
-        """
-        {
-            "servers": {
-                "my-mcp-server": {
-                    "type": "stdio",
-                    "command": "my-command",
-                    "args": []
-                }
-            }
-        }
-        """
-    }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 8) {
-                GroupBox(
-                    label: Text("Model Context Protocol (MCP) Configuration")
-                        .fontWeight(.bold)
-                ) {
-                    Text(
-                        "MCP is an open standard that connects AI models to external tools. In Xcode, it enhances GitHub Copilot's agent mode by connecting to any MCP server and integrating its tools into your workflow. [Learn More](https://modelcontextprotocol.io/introduction)"
-                    )
-                }.groupBoxStyle(CardGroupBoxStyle())
-
-                Button {
-                    openConfigFile()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "plus")
-                        Text("Edit Config")
-                    }
-                }
-                .buttonStyle(.borderedProminentWhite)
-                .help("Configure your MCP server")
-
-                GroupBox(label: Text("Example Configuration").fontWeight(.bold)) {
-                    ZStack(alignment: .topTrailing) {
-                        Text(exampleConfig)
-                            .font(.system(.body, design: .monospaced))
-                            .padding(10)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(
-                                Color(nsColor: .textBackgroundColor).opacity(0.5)
-                            )
-                            .textSelection(.enabled)
-                            .cornerRadius(8)
-
-                        CopyButton {
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(exampleConfig, forType: .string)
-                        }
-                    }
-                }.groupBoxStyle(CardGroupBoxStyle())
+                MCPIntroView()
+                MCPToolsListView()
             }
             .padding(20)
             .onAppear {
                 setupConfigFilePath()
                 startMonitoringConfigFile()
+                refreshConfiguration(())
             }
             .onDisappear {
                 stopMonitoringConfigFile()
@@ -131,11 +39,6 @@ struct MCPConfigView: View {
     }
 
     private func setupConfigFilePath() {
-        let homeDirectory = FileManager.default.homeDirectoryForCurrentUser
-       configFilePath = homeDirectory.appendingPathComponent(".config/github-copilot/xcode/mcp.json").path
-
-        // Create directory and file if they don't exist
-        let configDirectory = homeDirectory.appendingPathComponent(".config/github-copilot/xcode")
         let fileManager = FileManager.default
 
         if !fileManager.fileExists(atPath: configDirectory.path) {
@@ -239,11 +142,6 @@ struct MCPConfigView: View {
         isMonitoring = false
         fileMonitorTask?.cancel()
         fileMonitorTask = nil
-    }
-
-    private func openConfigFile() {
-        let url = URL(fileURLWithPath: configFilePath)
-        NSWorkspace.shared.open(url)
     }
 
     func refreshConfiguration(_: Any) {

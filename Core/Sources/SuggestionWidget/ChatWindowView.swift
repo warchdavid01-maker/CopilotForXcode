@@ -119,7 +119,7 @@ struct ChatLoadingView: View {
             Spacer()
             
             VStack(spacing: 24) {
-                Instruction()
+                Instruction(isAgentMode: .constant(false))
                 
                 ProgressView("Loading...")
                     

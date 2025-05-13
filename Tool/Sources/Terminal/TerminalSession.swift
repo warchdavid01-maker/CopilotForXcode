@@ -29,6 +29,8 @@ class ShellProcessManager {
     add-zsh-hook precmd __terminal_command_finished
     add-zsh-hook preexec __terminal_command_start
 
+    # print the initial prompt to output
+    echo -n 
     """
     
     /**
@@ -145,6 +147,12 @@ class ShellProcessManager {
         }
     }
 
+    func stopCommand() {
+        // Send SIGINT (Ctrl+C) to the running process
+        guard let process = process else { return }
+        process.interrupt() // Sends SIGINT to the process
+    }
+
     /**
      * Terminates the shell process
      */
@@ -184,21 +192,17 @@ public class TerminalSession: ObservableObject {
 
     public func executeCommand(currentDirectory: String, command: String, completion: @escaping (CommandExecutionResult) -> Void) {
         onCommandCompleted = completion
+        pendingCommandResult = ""
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.shellManager.startShell(inDirectory: currentDirectory.isEmpty ? NSHomeDirectory() : currentDirectory)
-            self?.shellManager.sendCommand("\n")
-        }
+        // Start shell in the requested directory
+        self.shellManager.startShell(inDirectory: currentDirectory.isEmpty ? NSHomeDirectory() : currentDirectory)
 
+        // Wait for shell prompt to appear before sending command
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
             self?.terminalOutput += "\(command)\n"
             self?.shellManager.sendCommand(command + "\n")
             self?.hasPendingCommand = true
         }
-    }
-
-    public func stopCommand() {
-        shellManager.sendCommand("\u{03}") // Send CTRL+C
     }
 
     /**
@@ -207,9 +211,10 @@ public class TerminalSession: ObservableObject {
      */
     public func handleTerminalInput(_ input: String) {
         DispatchQueue.main.async { [weak self] in
-            // Special handling for return/enter key
-            if input.contains("\r") {
-                self?.terminalOutput += "\n"
+            if input.contains("\u{03}") { // CTRL+C
+                let newInput = input.replacingOccurrences(of: "\u{03}", with: "\n")
+                self?.terminalOutput += newInput
+                self?.shellManager.stopCommand()
                 self?.shellManager.sendCommand("\n")
                 return
             }

@@ -23,8 +23,12 @@ func registerClientTools(server: GitHubCopilotConversationServiceType) async {
                 "command",
                 "explanation",
                 "isBackground"
-            ])
+            ]),
+        confirmationMessages: LanguageModelToolConfirmationMessages(
+            title: "Run command In Terminal",
+            message: "Run command In Terminal"
         )
+    )
     let getErrorsTool: LanguageModelToolInformation = .init(
         name: ToolName.getErrors.rawValue,
         description: "Get any compile or lint errors in a code file. If the user mentions errors or problems in a file, they may be referring to these. Use the tool to see the same errors that the user is seeing. Also use this tool after editing a file to validate the change.",

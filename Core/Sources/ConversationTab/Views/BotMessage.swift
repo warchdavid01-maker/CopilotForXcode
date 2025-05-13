@@ -102,6 +102,19 @@ struct BotMessage: View {
             }
         }
     }
+    
+    private var agentWorkingStatus: some View {
+        HStack(spacing: 4) {
+            ProgressView()
+                .controlSize(.small)
+                .frame(width: 20, height: 16)
+                .scaleEffect(0.7)
+            
+            Text("Working...")
+                .font(.system(size: chatFontSize))
+                .foregroundColor(.secondary)
+        }
+    }
 
     var body: some View {
         HStack {
@@ -128,7 +141,9 @@ struct BotMessage: View {
                     ProgressAgentRound(rounds: editAgentRounds, chat: chat)
                 }
 
-                ThemedMarkdownText(text: text, chat: chat)
+                if !text.isEmpty {
+                    ThemedMarkdownText(text: text, chat: chat)
+                }
 
                 if errorMessage != nil {
                     HStack(spacing: 4) {
@@ -136,8 +151,14 @@ struct BotMessage: View {
                         ThemedMarkdownText(text: errorMessage!, chat: chat)
                     }
                 }
-
-                ResponseToolBar(id: id, chat: chat, text: text)
+                
+                if shouldShowWorkingStatus() {
+                    agentWorkingStatus
+                }
+                
+                if shouldShowToolBar() {
+                    ResponseToolBar(id: id, chat: chat, text: text)
+                }
             }
             .shadow(color: .black.opacity(0.05), radius: 6)
             .contextMenu {
@@ -157,6 +178,33 @@ struct BotMessage: View {
                 }
             }
         }
+    }
+    
+    private func shouldShowWorkingStatus() -> Bool {
+        let hasRunningStep: Bool = steps.contains(where: { $0.status == .running })
+        let hasRunningRound: Bool = editAgentRounds.contains(where: { round in
+            return round.toolCalls?.contains(where: { $0.status == .running }) ?? false
+        })
+        
+        if hasRunningStep || hasRunningRound {
+            return false
+        }
+        
+        // Only show working status for the current bot message being received
+        return chat.isReceivingMessage && isLatestAssistantMessage()
+    }
+    
+    private func shouldShowToolBar() -> Bool {
+        // Always show toolbar for historical messages
+        if !isLatestAssistantMessage() { return true }
+        
+        // For current message, only show toolbar when message is complete
+        return !chat.isReceivingMessage
+    }
+    
+    private func isLatestAssistantMessage() -> Bool {
+        let lastMessage = chat.history.last
+        return lastMessage?.role == .assistant && lastMessage?.id == id
     }
 }
 

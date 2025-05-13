@@ -95,6 +95,7 @@ public final class ChatService: ChatServiceType, ObservableObject {
         subscribeToConversationContextRequest()
         subscribeToWatchedFilesHandler()
         subscribeToClientToolInvokeEvent()
+        subscribeToClientToolConfirmationEvent()
     }
     
     private func subscribeToNotifications() {
@@ -136,6 +137,27 @@ public final class ChatService: ChatServiceType, ObservableObject {
         }).store(in: &cancellables)
     }
 
+    private func subscribeToClientToolConfirmationEvent() {
+        ClientToolHandlerImpl.shared.onClientToolConfirmationEvent.sink(receiveValue: { [weak self] (request, completion) in
+            guard let params = request.params, params.conversationId == self?.conversationId else { return }
+            let editAgentRounds: [AgentRound] = [
+                AgentRound(roundId: params.roundId,
+                           reply: "",
+                           toolCalls: [
+                            AgentToolCall(id: params.toolCallId, name: params.name, status: .waitForConfirmation, invokeParams: params)
+                           ]
+                          )
+            ]
+            self?.appendToolCallHistory(turnId: params.turnId, editAgentRounds: editAgentRounds)
+            self?.pendingToolCallRequests[params.toolCallId] = ToolCallRequest(
+                requestId: request.id,
+                turnId: params.turnId,
+                roundId: params.roundId,
+                toolCallId: params.toolCallId,
+                completion: completion)
+        }).store(in: &cancellables)
+    }
+
     private func subscribeToClientToolInvokeEvent() {
         ClientToolHandlerImpl.shared.onClientToolInvokeEvent.sink(receiveValue: { [weak self] (request, completion) in
             guard let params = request.params, params.conversationId == self?.conversationId else { return }
@@ -154,15 +176,7 @@ public final class ChatService: ChatServiceType, ObservableObject {
                 return
             }
 
-            let completed = copilotTool.invokeTool(request, completion: completion, chatHistoryUpdater: self?.appendToolCallHistory, contextProvider: self)
-            if !completed {
-                self?.pendingToolCallRequests[params.toolCallId] = ToolCallRequest(
-                    requestId: request.id,
-                    turnId: params.turnId,
-                    roundId: params.roundId,
-                    toolCallId: params.toolCallId,
-                    completion: completion)
-            }
+            copilotTool.invokeTool(request, completion: completion, chatHistoryUpdater: self?.appendToolCallHistory, contextProvider: self)
         }).store(in: &cancellables)
     }
 
@@ -225,11 +239,9 @@ public final class ChatService: ChatServiceType, ObservableObject {
         }
 
         // Send the tool call result back to the server
-        if let toolCallRequest = self.pendingToolCallRequests[toolCallId], status == .completed, let result = payload {
+        if let toolCallRequest = self.pendingToolCallRequests[toolCallId], status == .accepted {
             self.pendingToolCallRequests.removeValue(forKey: toolCallId)
-            let toolResult = LanguageModelToolResult(content: [
-                .init(value: result)
-            ])
+            let toolResult = LanguageModelToolConfirmationResult(result: .Accept)
             let jsonResult = try? JSONEncoder().encode(toolResult)
             let jsonValue = (try? JSONDecoder().decode(JSONValue.self, from: jsonResult ?? Data())) ?? JSONValue.null
             toolCallRequest.completion(
@@ -505,12 +517,27 @@ public final class ChatService: ChatServiceType, ObservableObject {
     private func handleProgressBegin(token: String, progress: ConversationProgressBegin) {
         guard let workDoneToken = activeRequestId, workDoneToken == token else { return }
         conversationId = progress.conversationId
+        let turnId = progress.turnId
         
         Task {
             if var lastUserMessage = await memory.history.last(where: { $0.role == .user }) {
                 lastUserMessage.clsTurnID = progress.turnId
                 saveChatMessageToStorage(lastUserMessage)
             }
+            
+            /// Display an initial assistant message immediately after the user sends a message.
+            /// This improves perceived responsiveness, especially in Agent Mode where the first
+            /// ProgressReport may take long time.
+            let message = ChatMessage(
+                id: turnId,
+                chatTabID: self.chatTabInfo.id,
+                clsTurnID: turnId,
+                role: .assistant,
+                content: ""
+            )
+
+            // will persist in resetOngoingRequest()
+            await memory.appendMessage(message)
         }
     }
 
@@ -642,17 +669,18 @@ public final class ChatService: ChatServiceType, ObservableObject {
         // cancel all pending tool call requests
         for (_, request) in pendingToolCallRequests {
             pendingToolCallRequests.removeValue(forKey: request.toolCallId)
-            request.completion(AnyJSONRPCResponse(id: request.requestId,
-                                                    result: JSONValue.array([
-                                                        JSONValue.null,
-                                                        JSONValue.hash(
-                                                            [
-                                                                "code": .number(-32800), // client cancelled
-                                                                "message": .string("The client cancelled the tool call request \(request.toolCallId)")
-                                                            ])
-                                                    ])
-                                                 )
-                               )
+            let toolResult = LanguageModelToolConfirmationResult(result: .Dismiss)
+            let jsonResult = try? JSONEncoder().encode(toolResult)
+            let jsonValue = (try? JSONDecoder().decode(JSONValue.self, from: jsonResult ?? Data())) ?? JSONValue.null
+            request.completion(
+                AnyJSONRPCResponse(
+                    id: request.requestId,
+                    result: JSONValue.array([
+                        jsonValue,
+                        JSONValue.null
+                    ])
+                )
+            )
         }
         
         Task {
@@ -901,7 +929,7 @@ extension [ChatMessage] {
                 if index + 1 < count {
                     let nextMessage = self[index + 1]
                     if nextMessage.role == .assistant {
-                        turn.response = nextMessage.content
+                        turn.response = nextMessage.content + extractContentFromEditAgentRounds(nextMessage.editAgentRounds)
                         index += 1
                     }
                 }
@@ -912,5 +940,14 @@ extension [ChatMessage] {
         
         return turns
     }
+    
+    private func extractContentFromEditAgentRounds(_ editAgentRounds: [AgentRound]) -> String {
+        var content = ""
+        for round in editAgentRounds {
+            if !round.reply.isEmpty {
+                content += round.reply
+            }
+        }
+        return content
+    }
 }
-

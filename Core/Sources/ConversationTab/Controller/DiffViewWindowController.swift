@@ -31,7 +31,7 @@ class DiffViewWindowController: NSObject, NSWindowDelegate {
         let newDiffView = DiffView(chat: chat, fileEdit: fileEdit)
         
         if let window = diffWindow, let _ = hostingView {
-            window.title = "Diff of \(fileEdit.fileURL.lastPathComponent)"
+            window.title = "Diff View"
             
             let newHostingView = NSHostingView(rootView: newDiffView)
             // Ensure the hosting view fills the window
@@ -59,7 +59,7 @@ class DiffViewWindowController: NSObject, NSWindowDelegate {
                 defer: false
             )
             
-            window.title = "Diff of \(fileEdit.fileURL.lastPathComponent)"
+            window.title = "Diff View"
             window.contentView = newHostingView
             
             // Set constraints to fill the window

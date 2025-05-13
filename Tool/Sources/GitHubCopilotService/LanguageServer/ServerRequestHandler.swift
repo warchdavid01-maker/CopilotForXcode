@@ -14,6 +14,7 @@ class ServerRequestHandlerImpl : ServerRequestHandler {
     public static let shared = ServerRequestHandlerImpl()
     private let conversationContextHandler: ConversationContextHandler = ConversationContextHandlerImpl.shared
     private let watchedFilesHandler: WatchedFilesHandler = WatchedFilesHandlerImpl.shared
+    private let showMessageRequestHandler: ShowMessageRequestHandler = ShowMessageRequestHandlerImpl.shared
     
     func handleRequest(_ request: AnyJSONRPCRequest, workspaceURL: URL, callback: @escaping (AnyJSONRPCResponse) -> Void, service: GitHubCopilotService?) {
         let methodName = request.method
@@ -31,10 +32,28 @@ class ServerRequestHandlerImpl : ServerRequestHandler {
                 let watchedFilesParams = try JSONDecoder().decode(WatchedFilesParams.self, from: params)
                 watchedFilesHandler.handleWatchedFiles(WatchedFilesRequest(id: request.id, method: request.method, params: watchedFilesParams), workspaceURL: workspaceURL, completion: callback, service: service)
                 
+            case "window/showMessageRequest":
+                let params = try JSONEncoder().encode(request.params)
+                let showMessageRequestParams = try JSONDecoder().decode(ShowMessageRequestParams.self, from: params)
+                showMessageRequestHandler
+                    .handleShowMessage(
+                        ShowMessageRequest(
+                            id: request.id,
+                            method: request.method,
+                            params: showMessageRequestParams
+                        ),
+                        completion: callback
+                    )
+
             case "conversation/invokeClientTool":
                 let params = try JSONEncoder().encode(request.params)
                 let invokeParams = try JSONDecoder().decode(InvokeClientToolParams.self, from: params)
                 ClientToolHandlerImpl.shared.invokeClientTool(InvokeClientToolRequest(id: request.id, method: request.method, params: invokeParams), completion: callback)
+
+            case "conversation/invokeClientToolConfirmation":
+                let params = try JSONEncoder().encode(request.params)
+                let invokeParams = try JSONDecoder().decode(InvokeClientToolParams.self, from: params)
+                ClientToolHandlerImpl.shared.invokeClientToolConfirmation(InvokeClientToolConfirmationRequest(id: request.id, method: request.method, params: invokeParams), completion: callback)
 
             default:
                 break

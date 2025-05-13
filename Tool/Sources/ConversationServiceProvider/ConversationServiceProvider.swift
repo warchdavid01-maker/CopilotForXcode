@@ -219,7 +219,7 @@ public struct AgentToolCall: Codable, Equatable, Identifiable {
     public var invokeParams: InvokeClientToolParams?
     
     public enum ToolCallStatus: String, Codable {
-        case waitForConfirmation, running, completed, error, cancelled
+        case waitForConfirmation, accepted, running, completed, error, cancelled
     }
 
     public init(id: String, name: String, progressMessage: String? = nil, status: ToolCallStatus, error: String? = nil, invokeParams: InvokeClientToolParams? = nil) {

@@ -17,7 +17,7 @@ import Persist
 private let r: Double = 8
 
 public struct ChatPanel: View {
-    let chat: StoreOf<Chat>
+    @Perception.Bindable var chat: StoreOf<Chat>
     @Namespace var inputAreaNamespace
 
     public var body: some View {
@@ -27,7 +27,7 @@ public struct ChatPanel: View {
                 if chat.history.isEmpty {
                     VStack {
                         Spacer()
-                        Instruction()
+                        Instruction(isAgentMode: $chat.isAgentMode)
                         Spacer()
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
@@ -39,11 +39,10 @@ public struct ChatPanel: View {
                     
                     if chat.history.last?.role == .system {
                         ChatCLSError(chat: chat).padding(.trailing, 16)
-                    } else {
+                    } else if (chat.history.last?.followUp) != nil {
                         ChatFollowUp(chat: chat)
                             .padding(.trailing, 16)
                             .padding(.vertical, 8)
-
                     }
                 }
                 
@@ -58,7 +57,9 @@ public struct ChatPanel: View {
             .padding(.leading, 16)
             .padding(.bottom, 16)
             .background(Color(nsColor: .windowBackgroundColor))
-            .onAppear { chat.send(.appear) }
+            .onAppear {
+                chat.send(.appear)
+            }
         }
     }
 }
@@ -156,9 +157,6 @@ struct ChatPanelMessages: View {
                     .onPreferenceChange(ScrollViewOffsetPreferenceKey.self) { value in
                         scrollOffset = value
                         updatePinningState()
-                    }
-                    .overlay(alignment: .bottom) {
-                        StopRespondingButton(chat: chat)
                     }
                     .overlay(alignment: .bottomTrailing) {
                         scrollToBottomButton(proxy: proxy)
@@ -357,43 +355,6 @@ struct ChatHistoryItem: View {
     }
 }
 
-private struct StopRespondingButton: View {
-    let chat: StoreOf<Chat>
-
-    var body: some View {
-        WithPerceptionTracking {
-            if chat.isReceivingMessage {
-                Button(action: {
-                    chat.send(.stopRespondingButtonTapped)
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "stop.fill")
-                        Text("Stop Responding")
-                    }
-                    .padding(8)
-                    .background(
-                        .regularMaterial,
-                        in: RoundedRectangle(cornerRadius: r, style: .continuous)
-                    )
-                    .overlay {
-                        RoundedRectangle(cornerRadius: r, style: .continuous)
-                            .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
-                    }
-                }
-                .buttonStyle(.borderless)
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.bottom, 8)
-                .opacity(chat.isReceivingMessage ? 1 : 0)
-                .disabled(!chat.isReceivingMessage)
-                .transformEffect(.init(
-                    translationX: 0,
-                    y: chat.isReceivingMessage ? 0 : 20
-                ))
-            }
-        }
-    }
-}
-
 struct ChatFollowUp: View {
     let chat: StoreOf<Chat>
     @AppStorage(\.chatFontSize) var chatFontSize
@@ -533,11 +494,15 @@ struct ChatPanelInputArea: View {
                     
                     ZStack(alignment: .topLeading) {
                         if chat.typedMessage.isEmpty {
-                            Text("Ask Copilot or type / for commands")
-                                .font(.system(size: 14))
-                                .foregroundColor(Color(nsColor: .placeholderTextColor))
-                                .padding(8)
-                                .padding(.horizontal, 4)
+                            Group {
+                                chat.isAgentMode ?
+                                Text("Edit files in your workspace in agent mode") :
+                                Text("Ask Copilot or type / for commands")
+                            }
+                            .font(.system(size: 14))
+                            .foregroundColor(Color(nsColor: .placeholderTextColor))
+                            .padding(8)
+                            .padding(.horizontal, 4)
                         }
 
                         HStack(spacing: 0) {
@@ -563,6 +528,12 @@ struct ChatPanelInputArea: View {
                                     await onTypedMessageChanged(newValue: newValue)
                                 }
                             }
+                            /// When chat mode changed, the chat tamplate and agent need to be reloaded
+                            .onChange(of: chat.isAgentMode) { _ in
+                                Task {
+                                    await onTypedMessageChanged(newValue: chat.typedMessage)
+                                }
+                            }
                         }
                         .frame(maxWidth: .infinity)
                     }
@@ -572,17 +543,12 @@ struct ChatPanelInputArea: View {
                         ModelPicker()
 
                         Spacer()
-
-                        Button(action: {
-                            submitChatMessage()
-                        }) {
-                            Image(systemName: "paperplane.fill")
-                                .padding(4)
+                        
+                        Group {
+                            if chat.isReceivingMessage { stopButton }
+                            else { sendButton }
                         }
                         .buttonStyle(HoverButtonStyle(padding: 0))
-                        .disabled(chat.isReceivingMessage)
-                        .keyboardShortcut(KeyEquivalent.return, modifiers: [])
-                        .help("Send")
                     }
                     .padding(8)
                     .padding(.top, -4)
@@ -621,6 +587,27 @@ struct ChatPanelInputArea: View {
             }
         }
         
+        private var sendButton: some View {
+            Button(action: {
+                submitChatMessage()
+            }) {
+                Image(systemName: "paperplane.fill")
+                    .padding(4)
+            }
+            .keyboardShortcut(KeyEquivalent.return, modifiers: [])
+            .help("Send")
+        }
+        
+        private var stopButton: some View {
+            Button(action: {
+                chat.send(.stopRespondingButtonTapped)
+            }) {
+                Image(systemName: "stop.circle")
+                    .padding(4)
+            }
+            .help("Stop")
+        }
+        
         private var dropdownOverlay: some View {
             Group {
                 if dropDownShowingType != nil {
@@ -644,7 +631,7 @@ struct ChatPanelInputArea: View {
             if newValue.hasPrefix("/") {
                 filteredTemplates = await chatTemplateCompletion(text: newValue)
                 dropDownShowingType = filteredTemplates.isEmpty ? nil : .template
-            } else if newValue.hasPrefix("@") {
+            } else if newValue.hasPrefix("@") && !chat.isAgentMode {
                 filteredAgent = await chatAgentCompletion(text: newValue)
                 dropDownShowingType = filteredAgent.isEmpty ? nil : .agent
             } else {
@@ -800,24 +787,32 @@ struct ChatPanelInputArea: View {
 
         func chatTemplateCompletion(text: String) async -> [ChatTemplate] {
             guard text.count >= 1 && text.first == "/" else { return [] }
+            
             let prefix = text.dropFirst()
-            let promptTemplates = await SharedChatService.shared.loadChatTemplates() ?? []
+            var promptTemplates: [ChatTemplate] = []
             let releaseNotesTemplate: ChatTemplate = .init(
                 id: "releaseNotes",
                 description: "What's New",
                 shortDescription: "What's New",
-                scopes: [PromptTemplateScope.chatPanel]
+                scopes: [.chatPanel, .agentPanel]
             )
-
+            
+            if !chat.isAgentMode {
+                promptTemplates = await SharedChatService.shared.loadChatTemplates() ?? []
+            }
+            
             guard !promptTemplates.isEmpty else {
                 return [releaseNotesTemplate]
             }
-
+            
             let templates = promptTemplates + [releaseNotesTemplate]
             let skippedTemplates = [ "feedback", "help" ]
-
-            return templates.filter { $0.scopes.contains(.chatPanel) &&
-                $0.id.hasPrefix(prefix) && !skippedTemplates.contains($0.id)}
+            
+            return templates.filter {
+                $0.scopes.contains(chat.isAgentMode ? .agentPanel : .chatPanel) &&
+                $0.id.hasPrefix(prefix) &&
+                !skippedTemplates.contains($0.id)
+            }
         }
         
         func chatAgentCompletion(text: String) async -> [ChatAgent] {

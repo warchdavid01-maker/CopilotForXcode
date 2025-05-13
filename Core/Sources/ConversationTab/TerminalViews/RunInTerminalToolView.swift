@@ -12,7 +12,11 @@ struct RunInTerminalToolView: View {
     let chat: StoreOf<Chat>
     private var title: String = "Run command in terminal"
 
+    @AppStorage(\.codeBackgroundColorLight) var codeBackgroundColorLight
+    @AppStorage(\.codeBackgroundColorDark) var codeBackgroundColorDark
     @AppStorage(\.chatFontSize) var chatFontSize
+    @AppStorage(\.chatCodeFont) var chatCodeFont
+    @Environment(\.colorScheme) var colorScheme
     
     init(tool: AgentToolCall, chat: StoreOf<Chat>) {
         self.tool = tool
@@ -51,6 +55,8 @@ struct RunInTerminalToolView: View {
                     .foregroundColor(.gray.opacity(0.5))
             case .waitForConfirmation:
                 EmptyView()
+            case .accepted:
+                EmptyView()
             }
         }
     }
@@ -59,12 +65,19 @@ struct RunInTerminalToolView: View {
         WithPerceptionTracking {
             if tool.status == .waitForConfirmation || terminalSession != nil {
                 VStack {
-                    Text(self.title)
-                        .font(.system(size: chatFontSize))
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.primary)
-                        .background(Color.clear)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    HStack {
+                        Image("Terminal")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 16, height: 16)
+
+                        Text(self.title)
+                            .font(.system(size: chatFontSize))
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.primary)
+                            .background(Color.clear)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
 
                     toolView
                 }
@@ -79,7 +92,16 @@ struct RunInTerminalToolView: View {
             }
         }
     }
-    
+
+    var codeBackgroundColor: Color {
+        if colorScheme == .light, let color = codeBackgroundColorLight.value {
+            return color.swiftUIColor
+        } else if let color = codeBackgroundColorDark.value {
+            return color.swiftUIColor
+        }
+        return Color(nsColor: .textBackgroundColor).opacity(0.7)
+    }
+
     var toolView: some View {
         WithPerceptionTracking {
             VStack {
@@ -88,12 +110,17 @@ struct RunInTerminalToolView: View {
                         statusIcon
                             .frame(width: 16, height: 16)
 
-                        ThemedMarkdownText(text: command!, chat: chat)
-                            .font(.system(.body, design: .monospaced))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
+                        Text(command!)
+                            .textSelection(.enabled)
+                            .font(.system(size: chatFontSize, design: .monospaced))
+                            .padding(8)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color(NSColor.textBackgroundColor))
+                            .foregroundStyle(.primary)
+                            .background(codeBackgroundColor)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 6).stroke(Color.primary.opacity(0.05), lineWidth: 1)
+                            }
                     }
                 } else {
                     Text("Invalid parameter in the toolcall for runInTerminal")
@@ -110,39 +137,19 @@ struct RunInTerminalToolView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                     HStack {
-                        Button("Continue") {
-                            chat.send(.toolCallStarted(tool.id))
-                            Task {
-                                let projectURL = await XcodeInspector.shared.safe.realtimeActiveProjectURL
-                                let currentDirectory = projectURL?.path ?? ""
-                                let session = TerminalSessionManager.shared.createSession(for: tool.id)
-                                if isBackground == true {
-                                    session.executeCommand(
-                                        currentDirectory: currentDirectory,
-                                        command: command!) { result in
-                                            // do nothing
-                                        }
-                                    chat.send(.toolCallCompleted(tool.id, "Command is running in terminal with ID=\(tool.id)"))
-                                } else {
-                                    session.executeCommand(
-                                        currentDirectory: currentDirectory,
-                                        command: command!) { result in
-                                            chat.send(.toolCallCompleted(tool.id, result.output))
-                                        }
-                                }
-                            }
-                        }
-                        .buttonStyle(BorderedProminentButtonStyle())
-
                         Button("Cancel") {
                             chat.send(.toolCallCancelled(tool.id))
                         }
+
+                        Button("Continue") {
+                            chat.send(.toolCallAccepted(tool.id))
+                        }
+                        .buttonStyle(BorderedProminentButtonStyle())
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 8)
+                    .padding(.top, 4)
                 }
             }
         }
     }
-        
 }

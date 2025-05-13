@@ -90,7 +90,7 @@ struct Chat {
         case downvote(MessageID, ConversationRating)
         case copyCode(MessageID)
         case insertCode(String)
-        case toolCallStarted(String)
+        case toolCallAccepted(String)
         case toolCallCompleted(String, String)
         case toolCallCancelled(String)
 
@@ -182,10 +182,10 @@ struct Chat {
                     try await service.send(id, content: message, skillSet: skillSet, references: selectedFiles, model: selectedModelFamily, agentMode: agentMode)
                 }.cancellable(id: CancelID.sendMessage(self.id))
             
-            case let .toolCallStarted(toolCallId):
+            case let .toolCallAccepted(toolCallId):
                 guard !toolCallId.isEmpty else { return .none }
                 return .run { _ in
-                    service.updateToolCallStatus(toolCallId: toolCallId, status: .running)
+                    service.updateToolCallStatus(toolCallId: toolCallId, status: .accepted)
                 }.cancellable(id: CancelID.sendMessage(self.id))
             case let .toolCallCancelled(toolCallId):
                 guard !toolCallId.isEmpty else { return .none }

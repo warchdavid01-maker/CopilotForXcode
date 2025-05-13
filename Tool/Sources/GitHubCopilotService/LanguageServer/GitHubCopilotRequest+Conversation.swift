@@ -33,6 +33,7 @@ struct ConversationCreateParams: Codable {
     var ignoredSkills: [String]?
     var model: String?
     var chatMode: String?
+    var needToolCallConfirmation: Bool?
 
     struct Capabilities: Codable {
         var skills: [String]
@@ -138,6 +139,7 @@ struct TurnCreateParams: Codable {
     var workspaceFolder: String?
     var workspaceFolders: [WorkspaceFolder]?
     var chatMode: String?
+    var needToolCallConfirmation: Bool?
 }
 
 // MARK: Copy

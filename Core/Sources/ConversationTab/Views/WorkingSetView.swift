@@ -15,16 +15,22 @@ struct WorkingSetView: View {
     
     var body: some View {
         WithPerceptionTracking {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(spacing: 4) {
                 
                 WorkingSetHeader(chat: chat)
+                    .frame(height: 24)
+                    .padding(.leading, 12)
+                    .padding(.trailing, 5)
                 
-                ForEach(chat.fileEditMap.elements, id: \.key.path) { element in
-                    FileEditView(chat: chat, fileEdit: element.value)
+                VStack(spacing: 0) {
+                    ForEach(chat.fileEditMap.elements, id: \.key.path) { element in
+                        FileEditView(chat: chat, fileEdit: element.value)
+                    }
                 }
+                .padding(.horizontal, 5)
             }
-            .padding(.vertical, 8)
-            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 10)
             .frame(maxWidth: .infinity)
             .background(
                 RoundedCorners(tl: r, tr: r, bl: 0, br: 0)
@@ -41,40 +47,73 @@ struct WorkingSetView: View {
 struct WorkingSetHeader: View {
     let chat: StoreOf<Chat>
     
+    @Environment(\.colorScheme) var colorScheme
+    
     func getTitle() -> String {
         return chat.fileEditMap.count > 1 ? "\(chat.fileEditMap.count) files changed" : "1 file changed"
     }
     
+    @ViewBuilder
+    private func buildActionButton(
+        text: String,
+        textForegroundColor: Color = .white,
+        textBackgroundColor: Color = .gray,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(text)
+                .foregroundColor(textForegroundColor)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(textBackgroundColor)
+                .cornerRadius(2)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 2)
+                        .stroke(Color.white.opacity(0.07), lineWidth: 1)
+                )
+                .frame(width: 60, height: 15, alignment: .center)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+    
     var body: some View {
         WithPerceptionTracking {
-            HStack {
+            HStack(spacing: 0) {
                 Text(getTitle())
                     .foregroundColor(.secondary)
-                    .font(.system(size: 12))
+                    .font(.system(size: 13))
                 
                 Spacer()
                 
                 if chat.fileEditMap.contains(where: {_, fileEdit in
                     return fileEdit.status == .none
                 }) {
-                    /// Undo all edits
-                    Button("Undo") {
-                        chat.send(.undoEdits(fileURLs: chat.fileEditMap.values.map { $0.fileURL }))
+                    HStack(spacing: -10) {
+                        /// Undo all edits
+                        buildActionButton(
+                            text: "Undo",
+                            textForegroundColor: colorScheme == .dark ? .white : .black,
+                            textBackgroundColor: Color("WorkingSetHeaderUndoButtonColor")
+                        ) {
+                            chat.send(.undoEdits(fileURLs: chat.fileEditMap.values.map { $0.fileURL }))
+                        }
+                        .help("Undo All Edits")
+                        
+                        /// Keep all edits
+                        buildActionButton(text: "Keep", textBackgroundColor: Color("WorkingSetHeaderKeepButtonColor")) {
+                            chat.send(.keepEdits(fileURLs: chat.fileEditMap.values.map { $0.fileURL }))
+                        }
+                        .help("Keep All Edits")
                     }
-                    .help("Undo All Edits")
                     
-                    Button("Keep") {
-                        chat.send(.keepEdits(fileURLs: chat.fileEditMap.values.map { $0.fileURL }))
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .help("Keep All Edits")
                 } else {
-                    Button("Done") {
+                    buildActionButton(text: "Done") {
                         chat.send(.resetEdits)
                     }
                     .help("Done")
                 }
             }
+            
         }
     }
 }
@@ -82,90 +121,105 @@ struct WorkingSetHeader: View {
 struct FileEditView: View {
     let chat: StoreOf<Chat>
     let fileEdit: FileEdit
-    
     @State private var isHovering = false
+    
+    enum ActionButtonImageType {
+        case system(String), asset(String)
+    }
+    
+    @ViewBuilder
+    private func buildActionButton(
+        imageType: ActionButtonImageType,
+        help: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Group {
+                switch imageType {
+                case .system(let name):
+                    Image(systemName: name)
+                        .font(.system(size: 16, weight: .regular))
+                case .asset(let name):
+                    Image(name)
+                        .renderingMode(.template)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(height: 16)
+                }
+            }
+            .foregroundColor(.white)
+            .frame(width: 22)
+            .frame(maxHeight: .infinity)
+        }
+        .buttonStyle(HoverButtonStyle(padding: 0, hoverColor: .white.opacity(0.2)))
+        .help(help)
+    }
+    
+    var actionButtons: some View {
+        HStack(spacing: 0) {
+            if fileEdit.status == .none {
+                buildActionButton(
+                    imageType: .system("xmark"),
+                    help: "Remove file"
+                ) {
+                    chat.send(.discardFileEdits(fileURLs: [fileEdit.fileURL]))
+                }
+                buildActionButton(
+                    imageType: .asset("DiffEditor"),
+                    help: "Open changes in Diff Editor"
+                ) {
+                    chat.send(.openDiffViewWindow(fileURL: fileEdit.fileURL))
+                }
+                buildActionButton(
+                    imageType: .asset("Discard"),
+                    help: "Undo"
+                ) {
+                    chat.send(.undoEdits(fileURLs: [fileEdit.fileURL]))
+                }
+                buildActionButton(
+                    imageType: .system("checkmark"),
+                    help: "Keep"
+                ) {
+                    chat.send(.keepEdits(fileURLs: [fileEdit.fileURL]))
+                }
+            }
+        }
+    }
 
     var body: some View {
-        ZStack(alignment: .trailing) {
+        HStack(spacing: 0) {
             HStack(spacing: 4) {
-                Button(action: {
-                    chat.send(.openDiffViewWindow(fileURL: fileEdit.fileURL))
-                }) {
-                    drawFileIcon(fileEdit.fileURL)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 16, height: 16)
-                        .foregroundColor(.secondary)
-                    
-                    Text(fileEdit.fileURL.lastPathComponent)
-                        .bold()
-                        .font(.system(size: 14))
-                }
-                .buttonStyle(HoverButtonStyle())
+                drawFileIcon(fileEdit.fileURL)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 16, height: 16)
+                    .foregroundColor(.secondary)
                 
-                Spacer()
+                Text(fileEdit.fileURL.lastPathComponent)
+                    .font(.system(size: 13))
+                    .foregroundColor(isHovering ? .white : Color("WorkingSetItemColor"))
             }
             
+            Spacer()
+            
             if isHovering {
-                HStack(spacing: 4) {
-                    
-                    Spacer()
-                    
-                    if fileEdit.status == .none {
-                        Button {
-                            chat.send(.undoEdits(fileURLs: [fileEdit.fileURL]))
-                        } label: {
-                            Image(systemName: "arrow.uturn.backward")
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: 14, height: 14)
-                                .foregroundColor(.secondary)
-                        }
-                        .buttonStyle(HoverButtonStyle(padding: 0))
-                        .help("Undo")
-                        
-                        Button {
-                            chat.send(.keepEdits(fileURLs: [fileEdit.fileURL]))
-                        } label: {
-                            Image(systemName: "checkmark")
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: 14, height: 14)
-                                .foregroundColor(.secondary)
-                        }
-                        .buttonStyle(HoverButtonStyle(padding: 0))
-                        .help("Keep")
-                        
-                        Button {
-                            chat.send(.openDiffViewWindow(fileURL: fileEdit.fileURL))
-                        } label: {
-                            Image(systemName: "pencil.and.list.clipboard")
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: 14, height: 14)
-                                .foregroundColor(.secondary)
-                        }
-                        .buttonStyle(HoverButtonStyle(padding: 0))
-                        .help("Open changes in Diff Editor")
-                    }
-                    
-                    Button {
-                        /// User directly close this edit. undo and remove it
-                        chat.send(.discardFileEdits(fileURLs: [fileEdit.fileURL]))
-                    } label: {
-                        Image(systemName: "xmark")
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 14, height: 14)
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(HoverButtonStyle(padding: 0))
-                    .help("Remove file")
-                }
+                actionButtons
+                    .padding(.trailing, 8)
             }
         }
         .onHover { hovering in
             isHovering = hovering
+        }
+        .padding(.leading, 7)
+        .frame(height: 24)
+        .hoverRadiusBackground(
+            isHovered: isHovering,
+            hoverColor: Color.blue,
+            cornerRadius: 5,
+            showBorder: true
+        )
+        .onTapGesture {
+            chat.send(.openDiffViewWindow(fileURL: fileEdit.fileURL))
         }
     }
 }

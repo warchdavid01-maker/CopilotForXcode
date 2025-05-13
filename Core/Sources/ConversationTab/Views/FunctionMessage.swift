@@ -79,48 +79,8 @@ struct FunctionMessage: View {
                 RoundedRectangle(cornerRadius: 6)
                     .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
             )
-            
-//            HStack {
-//                Button(action: {
-//                    // Add your refresh action here
-//                }) {
-//                    Image(systemName: "arrow.clockwise")
-//                        .resizable()
-//                        .aspectRatio(contentMode: .fit)
-//                        .frame(width: 14, height: 14)
-//                        .frame(width: 20, height: 20, alignment: .center)
-//                        .foregroundColor(.secondary)
-//                        .background(
-//                            .regularMaterial,
-//                            in: RoundedRectangle(cornerRadius: 4, style: .circular)
-//                        )
-//                        .padding(4)
-//                }
-//                .buttonStyle(.borderless)
-//                
-//                DownvoteButton { rating in
-//                    chat.send(.downvote(id, rating))
-//                }
-//                
-//                Button(action: {
-//                    // Add your more options action here
-//                }) {
-//                    Image(systemName: "ellipsis")
-//                        .resizable()
-//                        .aspectRatio(contentMode: .fit)
-//                        .frame(width: 14, height: 14)
-//                        .frame(width: 20, height: 20, alignment: .center)
-//                        .foregroundColor(.secondary)
-//                        .background(
-//                            .regularMaterial,
-//                            in: RoundedRectangle(cornerRadius: 4, style: .circular)
-//                        )
-//                        .padding(4)
-//                }
-//                .buttonStyle(.borderless)
-//            }
+            .padding(.vertical, 4)
         }
-        .padding(.vertical, 12)
     }
 }
 

@@ -8,26 +8,26 @@ struct CopilotIntroView: View {
             VStack(alignment: .center, spacing: 8) {
                 CopilotIntroItemView(
                     imageName: "CopilotLogo",
-                    title: "Inline Code Suggestion",
-                    description: "Receive context-aware code suggestions and text completion in Xcode. Press Tab ⇥ to accept."
+                    title: "Agent Mode",
+                    description: "Activate Agent Mode to handle multi-step coding tasks with Copilot."
                 )
                 
                 CopilotIntroItemView(
-                    systemImage: "option",
-                    title: "Full Suggestions",
-                    description: "Press Option ⌥ for multi-line suggestions (first line is inline). Use Copilot Chat to refine and explain."
+                    systemImage: "wrench.and.screwdriver",
+                    title: "MCP Support",
+                    description: "Connect to MCP to extend your Copilot with custom tools and services for advanced workflows."
                 )
                 
                 CopilotIntroItemView(
                     imageName: "ChatIcon",
-                    title: "Chat",
-                    description: "Get real-time coding assistance, debug issues, and generate code snippets directly within Xcode."
+                    title: "Ask Mode",
+                    description: "Use Ask Mode to chat with Copilot to understand, debug, or improve your code."
                 )
                 
                 CopilotIntroItemView(
-                    imageName: "GitHubMark",
-                    title: "GitHub Context",
-                    description: "Copilot gives smarter code suggestions with GitHub and project context. Use chat to discuss, debug, and explain your code."
+                    systemImage: "option",
+                    title: "Code Suggestions",
+                    description: "Get smart code suggestions in Xcode. Press Tab ⇥ to accept a code suggestion, or Option ⌥ to see more alternatives."
                 )
             }
             .padding(0)

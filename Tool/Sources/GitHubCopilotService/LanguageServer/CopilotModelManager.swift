@@ -10,7 +10,9 @@ public class CopilotModelManager {
     private static var availableLLMs: [CopilotModel] = []
     
     public static func updateLLMs(_ models: [CopilotModel]) {
-        availableLLMs = models.sorted(by: { $0.modelName.lowercased() < $1.modelName.lowercased()})
+        let sortedModels = models.sorted(by: { $0.modelName.lowercased() < $1.modelName.lowercased() })
+        guard sortedModels != availableLLMs else { return }
+        availableLLMs = sortedModels
         NotificationCenter.default.post(name: .gitHubCopilotModelsDidChange, object: nil)
     }
 

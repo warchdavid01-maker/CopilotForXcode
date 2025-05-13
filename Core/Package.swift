@@ -131,6 +131,7 @@ let package = Package(
                     .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
                     .product(name: "KeyboardShortcuts", package: "KeyboardShortcuts"),
                     .product(name: "GitHubCopilotService", package: "Tool"),
+                    .product(name: "Persist", package: "Tool"),
                 ]),
         
         // MARK: - Suggestion Service

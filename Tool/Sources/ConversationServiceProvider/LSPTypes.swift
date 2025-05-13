@@ -100,10 +100,13 @@ public struct LanguageModelToolInformation: Codable, Equatable {
     /// A particular language model may not support all JSON schema features.
     public let inputSchema: LanguageModelToolSchema?
 
-    public init(name: String, description: String, inputSchema: LanguageModelToolSchema?) {
+    public let confirmationMessages: LanguageModelToolConfirmationMessages?
+
+    public init(name: String, description: String, inputSchema: LanguageModelToolSchema?, confirmationMessages: LanguageModelToolConfirmationMessages? = nil) {
         self.name = name
         self.description = description
         self.inputSchema = inputSchema
+        self.confirmationMessages = confirmationMessages
     }
 }
 
@@ -139,6 +142,16 @@ public struct ToolInputPropertySchema: Codable, Equatable {
     }
 }
 
+public struct LanguageModelToolConfirmationMessages: Codable, Equatable {
+    public let title: String
+    public let message: String
+    
+    public init(title: String, message: String) {
+        self.title = title
+        self.message = message
+    }
+}
+
 public struct InvokeClientToolParams: Codable, Equatable {
     /// The name of the tool to be invoked.
     public let name: String
@@ -157,6 +170,12 @@ public struct InvokeClientToolParams: Codable, Equatable {
 
     /// The unique ID for this specific tool call.
     public let toolCallId: String
+
+    /// The title of the tool confirmation.
+    public let title: String?
+
+    /// The message of the tool confirmation.
+    public let message: String?
 }
 
 /// A helper type to encode/decode `Any` values in JSON.
@@ -250,3 +269,21 @@ public struct Doc: Codable {
         self.uri = uri
     }
 }
+
+public enum ToolConfirmationResult: String, Codable {
+    /// The user accepted the tool invocation.
+    case Accept = "accept"
+    /// The user dismissed the tool invocation.
+    case Dismiss = "dismiss"
+}
+
+public struct LanguageModelToolConfirmationResult: Codable, Equatable {
+    /// The result of the confirmation.
+    public let result: ToolConfirmationResult
+    
+    public init(result: ToolConfirmationResult) {
+        self.result = result
+    }
+}
+
+public typealias InvokeClientToolConfirmationRequest = JSONRPCRequest<InvokeClientToolParams>

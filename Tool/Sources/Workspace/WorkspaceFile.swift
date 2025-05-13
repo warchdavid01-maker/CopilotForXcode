@@ -3,7 +3,7 @@ import Logger
 import ConversationServiceProvider
 import CopilotForXcodeKit
 
-public let supportedFileExtensions: Set<String> = ["swift", "m", "mm", "h", "cpp", "c", "js", "py", "rb", "java", "applescript", "scpt", "plist", "entitlements", "md", "json", "xml", "txt", "yaml", "yml"]
+public let supportedFileExtensions: Set<String> = ["swift", "m", "mm", "h", "cpp", "c", "js", "ts", "py", "rb", "java", "applescript", "scpt", "plist", "entitlements", "md", "json", "xml", "txt", "yaml", "yml", "html", "css"]
 public let skipPatterns: [String] = [
     ".git",
     ".svn",
@@ -79,12 +79,13 @@ public struct WorkspaceFile {
     
     static func getSubprojectURLs(in workspaceURL: URL) -> [URL] {
         let workspaceFile = workspaceURL.appendingPathComponent("contents.xcworkspacedata")
-        guard let data = try? Data(contentsOf: workspaceFile) else {
-            Logger.client.error("Failed to read workspace file at \(workspaceFile.path)")
+        do {
+            let data = try Data(contentsOf: workspaceFile)
+            return getSubprojectURLs(workspaceURL: workspaceURL, data: data)
+        } catch {
+            Logger.client.error("Failed to read workspace file at \(workspaceFile.path): \(error)")
             return []
         }
-
-        return getSubprojectURLs(workspaceURL: workspaceURL, data: data)
     }
     
     static func matchesPatterns(_ url: URL, patterns: [String]) -> Bool {

@@ -369,6 +369,20 @@ enum GitHubCopilotRequest {
         }
     }
     
+    // MARK: MCP Tools
+    
+    struct UpdatedMCPToolsStatus: GitHubCopilotRequestType {
+        typealias Response = Array<MCPServerToolsCollection>
+        
+        var params: UpdateMCPToolsStatusParams
+
+        var request: ClientRequest {
+            let data = (try? JSONEncoder().encode(params)) ?? Data()
+            let dict = (try? JSONDecoder().decode(JSONValue.self, from: data)) ?? .hash([:])
+            return .custom("mcp/updateToolsStatus", dict)
+        }
+    }
+    
     // MARK: - Conversation Agents
     
     struct GetAgents: GitHubCopilotRequestType {

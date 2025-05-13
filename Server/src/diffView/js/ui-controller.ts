@@ -1,18 +1,34 @@
-// ui-controller.js - UI event handlers and state management
+// ui-controller.ts - UI event handlers and state management
+import { DiffViewMessageHandler } from '../../shared/webkit';
 /**
  * UI state and file metadata
  */
-let filePath = null;
-let fileEditStatus = null;
+let filePath: string | null = null;
+let fileEditStatus: string | null = null;
+
+/**
+ * Interface for messages sent to Swift handlers
+ */
+interface SwiftMessage {
+    event: string;
+    data: {
+        filePath: string | null;
+        [key: string]: any;
+    };
+}
 
 /**
  * Initialize and set up UI elements and their event handlers
  * @param {string} initialPath - The initial file path
  * @param {string} initialStatus - The initial file edit status
  */
-function setupUI(initialPath = null, initialStatus = null) {
+function setupUI(initialPath: string | null = null, initialStatus: string | null = null): void {
     filePath = initialPath;
     fileEditStatus = initialStatus;
+
+    if (filePath) {
+        showFilePath(filePath);
+    }
     
     const keepButton = document.getElementById('keep-button');
     const undoButton = document.getElementById('undo-button');
@@ -35,7 +51,7 @@ function setupUI(initialPath = null, initialStatus = null) {
  * Update the UI based on file edit status
  * @param {string} status - The current file edit status
  */
-function updateUIStatus(status) {
+function updateUIStatus(status: string | null): void {
     fileEditStatus = status;
     const choiceButtons = document.getElementById('choice-buttons');
     
@@ -54,23 +70,27 @@ function updateUIStatus(status) {
  * @param {string} path - The file path
  * @param {string} status - The file edit status
  */
-function updateFileMetadata(path, status) {
+function updateFileMetadata(path: string | null, status: string | null): void {
     filePath = path;
     updateUIStatus(status);
+    if (filePath) {
+        showFilePath(filePath)
+    }
 }
 
 /**
  * Handle the "Keep" button click
  */
-function handleKeepButtonClick() {
+function handleKeepButtonClick(): void {
     // Send message to Swift handler
     if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.swiftHandler) {
-        window.webkit.messageHandlers.swiftHandler.postMessage({
+        const message: SwiftMessage = {
             event: 'keepButtonClicked',
             data: {
                 filePath: filePath
             }
-        });
+        };
+        window.webkit.messageHandlers.swiftHandler.postMessage(message);
     } else {
         console.log('Keep button clicked, but no message handler found');
     }
@@ -85,15 +105,16 @@ function handleKeepButtonClick() {
 /**
  * Handle the "Undo" button click
  */
-function handleUndoButtonClick() {
+function handleUndoButtonClick(): void {
     // Send message to Swift handler
     if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.swiftHandler) {
-        window.webkit.messageHandlers.swiftHandler.postMessage({
+        const message: SwiftMessage = {
             event: 'undoButtonClicked',
             data: {
                 filePath: filePath
             }
-        });
+        };
+        window.webkit.messageHandlers.swiftHandler.postMessage(message);
     } else {
         console.log('Undo button clicked, but no message handler found');
     }
@@ -109,15 +130,26 @@ function handleUndoButtonClick() {
  * Get the current file path
  * @returns {string} The current file path
  */
-function getFilePath() {
+function getFilePath(): string | null {
     return filePath;
+}
+
+/**
+ * Show the current file path
+ */
+function showFilePath(path: string): void {
+    const filePathElement = document.getElementById('file-path');
+    const fileName = path.split('/').pop() ?? '';
+    if (filePathElement) {
+        filePathElement.textContent = fileName
+    }
 }
 
 /**
  * Get the current file edit status
  * @returns {string} The current file edit status
  */
-function getFileEditStatus() {
+function getFileEditStatus(): string | null {
     return fileEditStatus;
 }
 
