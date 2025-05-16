@@ -488,7 +488,7 @@ struct ChatPanelInputArea: View {
                             }
                         )
                         .onAppear() {
-                            allFiles = ContextUtils.getFilesInActiveWorkspace()
+                            allFiles = ContextUtils.getFilesInActiveWorkspace(workspaceURL: chat.workspaceURL)
                         }
                     }
                     

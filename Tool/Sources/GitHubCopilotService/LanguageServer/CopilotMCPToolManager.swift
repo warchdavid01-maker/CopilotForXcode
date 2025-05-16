@@ -7,7 +7,6 @@ public extension Notification.Name {
 
 public class CopilotMCPToolManager {
     private static var availableMCPServerTools: [MCPServerToolsCollection] = []
-    private static var updatedMCPToolsStatusParams: UpdateMCPToolsStatusParams = .init(servers: [])
     
     public static func updateMCPTools(_ serverToolsCollections: [MCPServerToolsCollection]) {
         let sortedMCPServerTools = serverToolsCollections.sorted(by: { $0.name.lowercased() < $1.name.lowercased() })
@@ -29,21 +28,6 @@ public class CopilotMCPToolManager {
 
     public static func hasMCPTools() -> Bool {
         return !availableMCPServerTools.isEmpty
-    }
-    
-    public static func updateMCPToolsStatus(_ servers: [UpdateMCPToolsStatusServerCollection]) {
-        updatedMCPToolsStatusParams = .init(servers: servers)
-        DispatchQueue.main.async {
-            NotificationCenter.default
-                .post(
-                    name: .gitHubCopilotShouldUpdateMCPToolsStatus,
-                    object: nil
-                )
-        }
-    }
-    
-    public static func getUpdatedMCPToolsStatusParams() -> UpdateMCPToolsStatusParams {
-        return updatedMCPToolsStatusParams
     }
 
     public static func clearMCPTools() {

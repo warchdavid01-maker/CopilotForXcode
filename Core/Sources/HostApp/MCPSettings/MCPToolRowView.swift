@@ -23,6 +23,7 @@ struct MCPToolRow: View {
                                 .font(.system(size: 11))
                                 .foregroundColor(.secondary)
                                 .lineLimit(1)
+                                .help(description)
                         }
                     }
 
@@ -30,7 +31,7 @@ struct MCPToolRow: View {
                 }
             }
         }
-        .padding(.leading, 32)
+        .padding(.leading, 36)
         .padding(.vertical, 0)
         .onChange(of: tool._status) { isToolEnabled = $0 == .enabled }
         .onChange(of: isServerEnabled) { if !$0 { isToolEnabled = false } }

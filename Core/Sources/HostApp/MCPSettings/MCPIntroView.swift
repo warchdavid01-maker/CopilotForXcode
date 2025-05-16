@@ -13,7 +13,10 @@ struct MCPIntroView: View {
                 "my-mcp-server": {
                     "type": "stdio",
                     "command": "my-command",
-                    "args": []
+                    "args": [],
+                    "env": {
+                        "TOKEN": "my_token"
+                    }
                 }
             }
         }
@@ -75,7 +78,7 @@ struct MCPIntroView: View {
             .overlay(
                 RoundedRectangle(cornerRadius: 4)
                 .inset(by: 0.5)
-                .stroke(Color(red: 0.9, green: 0.9, blue: 0.9), lineWidth: 1)
+                .stroke(Color("GroupBoxStrokeColor"), lineWidth: 1)
             )
     }
     

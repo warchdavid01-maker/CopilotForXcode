@@ -558,6 +558,10 @@ public extension UserDefaultPreferenceKeys {
     var gitHubCopilotMCPConfig: PreferenceKey<String> {
         .init(defaultValue: "", key: "GitHubCopilotMCPConfig")
     }
+    
+    var gitHubCopilotMCPUpdatedStatus: PreferenceKey<String> {
+        .init(defaultValue: "", key: "GitHubCopilotMCPUpdatedStatus")
+    }
 
     var gitHubCopilotEnterpriseURI: PreferenceKey<String> {
         .init(defaultValue: "", key: "GitHubCopilotEnterpriseURI")

@@ -2,6 +2,7 @@ import Foundation
 import Logger
 import ConversationServiceProvider
 import CopilotForXcodeKit
+import XcodeInspector
 
 public let supportedFileExtensions: Set<String> = ["swift", "m", "mm", "h", "cpp", "c", "js", "ts", "py", "rb", "java", "applescript", "scpt", "plist", "entitlements", "md", "json", "xml", "txt", "yaml", "yml", "html", "css"]
 public let skipPatterns: [String] = [
@@ -96,6 +97,15 @@ public struct WorkspaceFile {
             }
         }
         return false
+    }
+
+    public static func getWorkspaceInfo(workspaceURL: URL) -> WorkspaceInfo? {
+        guard let projectURL = WorkspaceXcodeWindowInspector.extractProjectURL(workspaceURL: workspaceURL, documentURL: nil) else {
+            return nil
+        }
+
+        let workspaceInfo = WorkspaceInfo(workspaceURL: workspaceURL, projectURL: projectURL)
+        return workspaceInfo
     }
 
     public static func getProjects(workspace: WorkspaceInfo) -> [ProjectInfo] {

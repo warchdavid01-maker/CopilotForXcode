@@ -1,6 +1,8 @@
 import SwiftUI
 import Persist
 import GitHubCopilotService
+import Client
+import Logger
 
 /// Section for a single server's tools
 struct MCPServerToolsSection: View {
@@ -10,6 +12,54 @@ struct MCPServerToolsSection: View {
     @State private var toolEnabledStates: [String: Bool] = [:]
     @State private var isExpanded: Bool = true
     private var originalServerName: String { serverTools.name }
+
+    private var serverToggleLabel: some View {
+        HStack(spacing: 8) {
+            Text("MCP Server: \(serverTools.name)").fontWeight(.medium)
+            if serverTools.status == .error {
+                if hasUnsupportedServerType() {
+                    Badge(text: getUnsupportedServerTypeMessage(), level: .danger, icon: "xmark.circle.fill")
+                } else {
+                    let message = extractErrorMessage(serverTools.error?.description ?? "")
+                    Badge(text: message, level: .danger, icon: "xmark.circle.fill")
+                }
+            }
+            Spacer()
+        }
+    }
+    
+    private var serverToggle: some View {
+        Toggle(isOn: Binding(
+            get: { isServerEnabled },
+            set: { updateAllToolsStatus(enabled: $0) }
+        )) {
+            serverToggleLabel
+        }
+        .toggleStyle(.checkbox)
+        .padding(.leading, 4)
+        .disabled(serverTools.status == .error)
+    }
+    
+    private var divider: some View {
+        Divider()
+            .padding(.leading, 36)
+            .padding(.top, 2)
+            .padding(.bottom, 4)
+    }
+    
+    private var toolsList: some View {
+        VStack(spacing: 0) {
+            divider
+            ForEach(serverTools.tools, id: \.name) { tool in
+                MCPToolRow(
+                    tool: tool,
+                    isServerEnabled: isServerEnabled,
+                    isToolEnabled: toolBindingFor(tool),
+                    onToolToggleChanged: { handleToolToggleChange(tool: tool, isEnabled: $0) }
+                )
+            }
+        }
+    }
     
     // Function to check if the MCP config contains unsupported server types
     private func hasUnsupportedServerType() -> Bool {
@@ -37,61 +87,36 @@ struct MCPServerToolsSection: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            DisclosureGroup(isExpanded: $isExpanded) {
+        VStack(alignment: .leading, spacing: 0) {
+            // Conditional view rendering based on error state
+            if serverTools.status == .error {
+                // No disclosure group for error state
                 VStack(spacing: 0) {
-                    Divider()
-                        .padding(.leading, 32)
-                        .padding(.top, 2)
-                        .padding(.bottom, 4)
-                    ForEach(serverTools.tools, id: \.name) { tool in
-                        MCPToolRow(
-                            tool: tool,
-                            isServerEnabled: isServerEnabled,
-                            isToolEnabled: toolBindingFor(tool),
-                            onToolToggleChanged: { handleToolToggleChange(tool: tool, isEnabled: $0) }
-                        )
+                    serverToggle.padding(.leading, 12)
+                    divider.padding(.top, 4)
+                }
+            } else {
+                // Regular DisclosureGroup for non-error state
+                DisclosureGroup(isExpanded: $isExpanded) {
+                    toolsList
+                } label: {
+                    serverToggle
+                }
+                .onAppear {
+                    initializeToolStates()
+                    if forceExpand {
+                        isExpanded = true
                     }
                 }
-            } label: {
-                // Server name with checkbox
-                Toggle(isOn: Binding(
-                    get: { isServerEnabled },
-                    set: { updateAllToolsStatus(enabled: $0) }
-                )) {
-                    HStack(spacing: 8) {
-                        Text("MCP Server: \(serverTools.name)").fontWeight(.medium)
-                        if serverTools.status == .error {
-                            if hasUnsupportedServerType() {
-                                Badge(text: getUnsupportedServerTypeMessage(), level: .danger, icon: "xmark.circle.fill")
-                            } else {
-                                let message = extractErrorMessage(serverTools.error?.description ?? "")
-                                Badge(text: message, level: .danger, icon: "xmark.circle.fill")
-                            }
-                        }
+                .onChange(of: forceExpand) { newForceExpand in
+                    if newForceExpand {
+                        isExpanded = true
                     }
                 }
-                .toggleStyle(.checkbox)
-                .padding(.leading, 4)
-                .disabled(serverTools.status == .error)
-            }
-            .onAppear {
-                initializeToolStates()
-                if forceExpand {
-                    isExpanded = true
-                }
-            }
-            .onChange(of: forceExpand) { newForceExpand in
-                if newForceExpand {
-                    isExpanded = true
-                }
-            }
 
-            if !isExpanded {
-                Divider()
-                    .padding(.leading, 32)
-                    .padding(.top, 2)
-                    .padding(.bottom, 4)
+                if !isExpanded {
+                    divider
+                }
             }
         }
     }
@@ -158,8 +183,7 @@ struct MCPServerToolsSection: View {
             tools: [UpdatedMCPToolsStatus(name: tool.name, status: isEnabled ? .enabled : .disabled)]
         )
 
-        AppState.shared.updateMCPToolsStatus([serverUpdate])
-        CopilotMCPToolManager.updateMCPToolsStatus([serverUpdate])
+        updateMCPStatus([serverUpdate])
     }
     
     private func updateAllToolsStatus(enabled: Bool) {
@@ -182,7 +206,37 @@ struct MCPServerToolsSection: View {
             }
         )
         
-        AppState.shared.updateMCPToolsStatus([serverUpdate])
-        CopilotMCPToolManager.updateMCPToolsStatus([serverUpdate])
+        updateMCPStatus([serverUpdate])
+    }
+
+    private func updateMCPStatus(_ serverUpdates: [UpdateMCPToolsStatusServerCollection]) {
+        // Update status in AppState and CopilotMCPToolManager
+        AppState.shared.updateMCPToolsStatus(serverUpdates)
+        
+        // Encode and save status to UserDefaults
+        let encoder = JSONEncoder()
+        if let jsonData = try? encoder.encode(serverUpdates),
+           let jsonString = String(data: jsonData, encoding: .utf8)
+        {
+            UserDefaults.shared.set(jsonString, for: \.gitHubCopilotMCPUpdatedStatus)
+        }
+        
+        // In-process update
+        NotificationCenter.default.post(
+            name: .gitHubCopilotShouldUpdateMCPToolsStatus,
+            object: nil
+        )
+
+        Task {
+            do {
+                let service = try getService()
+                try await service.postNotification(
+                    name: Notification.Name
+                        .gitHubCopilotShouldUpdateMCPToolsStatus.rawValue
+                )
+            } catch {
+                Logger.client.error("Failed to post MCP status update notification: \(error.localizedDescription)")
+            }
+        }
     }
 }

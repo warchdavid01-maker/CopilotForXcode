@@ -16,11 +16,11 @@ public protocol ConversationServiceType {
 }
 
 public protocol ConversationServiceProvider {
-    func createConversation(_ request: ConversationRequest) async throws
-    func createTurn(with conversationId: String, request: ConversationRequest) async throws
-    func stopReceivingMessage(_ workDoneToken: String) async throws
-    func rateConversation(turnId: String, rating: ConversationRating) async throws
-    func copyCode(_ request: CopyCodeRequest) async throws
+    func createConversation(_ request: ConversationRequest, workspaceURL: URL?) async throws
+    func createTurn(with conversationId: String, request: ConversationRequest, workspaceURL: URL?) async throws
+    func stopReceivingMessage(_ workDoneToken: String, workspaceURL: URL?) async throws
+    func rateConversation(turnId: String, rating: ConversationRating, workspaceURL: URL?) async throws
+    func copyCode(_ request: CopyCodeRequest, workspaceURL: URL?) async throws
     func templates() async throws -> [ChatTemplate]?
     func models() async throws -> [CopilotModel]?
     func notifyDidChangeWatchedFiles(_ event: DidChangeWatchedFilesEvent, workspace: WorkspaceInfo) async throws

@@ -6,6 +6,7 @@ import SwiftUI
 import Toast
 import ConversationServiceProvider
 import GitHubCopilotService
+import ComposableArchitecture
 
 struct MCPConfigView: View {
     @State private var mcpConfig: String = ""
@@ -16,20 +17,24 @@ struct MCPConfigView: View {
     @State private var fileMonitorTask: Task<Void, Error>? = nil
     @Environment(\.colorScheme) var colorScheme
 
+    private static var lastSyncTimestamp: Date? = nil
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 8) {
-                MCPIntroView()
-                MCPToolsListView()
-            }
-            .padding(20)
-            .onAppear {
-                setupConfigFilePath()
-                startMonitoringConfigFile()
-                refreshConfiguration(())
-            }
-            .onDisappear {
-                stopMonitoringConfigFile()
+        WithPerceptionTracking {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 8) {
+                    MCPIntroView()
+                    MCPToolsListView()
+                }
+                .padding(20)
+                .onAppear {
+                    setupConfigFilePath()
+                    startMonitoringConfigFile()
+                    refreshConfiguration(())
+                }
+                .onDisappear {
+                    stopMonitoringConfigFile()
+                }
             }
         }
     }
@@ -145,6 +150,12 @@ struct MCPConfigView: View {
     }
 
     func refreshConfiguration(_: Any) {
+        if MCPConfigView.lastSyncTimestamp == lastModificationDate {
+            return
+        }
+
+        MCPConfigView.lastSyncTimestamp = lastModificationDate
+
         let fileURL = URL(fileURLWithPath: configFilePath)
         if let jsonString = readAndValidateJSON(from: fileURL) {
             UserDefaults.shared.set(jsonString, for: \.gitHubCopilotMCPConfig)

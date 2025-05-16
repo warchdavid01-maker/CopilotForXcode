@@ -90,7 +90,7 @@ let package = Package(
 
         .target(name: "Preferences", dependencies: ["Configs"]),
 
-        .target(name: "Terminal", dependencies: ["Logger"]),
+        .target(name: "Terminal", dependencies: ["Logger", "SystemUtils"]),
 
         .target(name: "Logger"),
 
@@ -307,6 +307,7 @@ let package = Package(
                 "Status",
                 "SystemUtils",
                 "Workspace",
+                "Persist",
                 .product(name: "LanguageServerProtocol", package: "LanguageServerProtocol"),
                 .product(name: "CopilotForXcodeKit", package: "CopilotForXcodeKit"),
             ]
@@ -346,7 +347,11 @@ let package = Package(
         
         // MARK: - SystemUtils
         
-        .target(name: "SystemUtils")
+        .target(
+            name: "SystemUtils",
+            dependencies: ["Logger"]
+        ),
+        .testTarget(name: "SystemUtilsTests", dependencies: ["SystemUtils"]),
     ]
 )
 

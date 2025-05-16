@@ -114,7 +114,7 @@ public class ConversationTab: ChatTab {
     
         let service = ChatService.service(for: info)
         self.service = service
-        chat = .init(initialState: .init(), reducer: { Chat(service: service) })
+        chat = .init(initialState: .init(workspaceURL: service.getWorkspaceURL()), reducer: { Chat(service: service) })
         super.init(store: store)
         
         // Start to observe changes of Chat Message
@@ -128,7 +128,7 @@ public class ConversationTab: ChatTab {
     @MainActor
     public init(service: ChatService, store: StoreOf<ChatTabItem>, with chatTabInfo: ChatTabInfo) {
         self.service = service
-        chat = .init(initialState: .init(), reducer: { Chat(service: service) })
+        chat = .init(initialState: .init(workspaceURL: service.getWorkspaceURL()), reducer: { Chat(service: service) })
         super.init(store: store)
     }
     

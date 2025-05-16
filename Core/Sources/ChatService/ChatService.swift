@@ -379,7 +379,7 @@ public final class ChatService: ChatServiceType, ObservableObject {
     public func stopReceivingMessage() async {
         if let activeRequestId = activeRequestId {
             do {
-                try await conversationProvider?.stopReceivingMessage(activeRequestId)
+                try await conversationProvider?.stopReceivingMessage(activeRequestId, workspaceURL: getWorkspaceURL())
             } catch {
                 print("Failed to cancel ongoing request with WDT: \(activeRequestId)")
             }
@@ -393,7 +393,7 @@ public final class ChatService: ChatServiceType, ObservableObject {
         await memory.clearHistory()
         if let activeRequestId = activeRequestId {
             do {
-                try await conversationProvider?.stopReceivingMessage(activeRequestId)
+                try await conversationProvider?.stopReceivingMessage(activeRequestId, workspaceURL: getWorkspaceURL())
             } catch {
                 print("Failed to cancel ongoing request with WDT: \(activeRequestId)")
             }
@@ -491,13 +491,20 @@ public final class ChatService: ChatServiceType, ObservableObject {
             try await send(UUID().uuidString, content: templateProcessor.process(sendingMessageImmediately), skillSet: [], references: [])
         }
     }
-    
+
+    public func getWorkspaceURL() -> URL? {
+        guard !chatTabInfo.workspacePath.isEmpty else {
+            return nil
+        }
+        return URL(fileURLWithPath: chatTabInfo.workspacePath)
+    }
+
     public func upvote(_ id: String, _ rating: ConversationRating) async {
-        try? await conversationProvider?.rateConversation(turnId: id, rating: rating)
+        try? await conversationProvider?.rateConversation(turnId: id, rating: rating, workspaceURL: getWorkspaceURL())
     }
     
     public func downvote(_ id: String, _ rating: ConversationRating) async {
-        try? await conversationProvider?.rateConversation(turnId: id, rating: rating)
+        try? await conversationProvider?.rateConversation(turnId: id, rating: rating, workspaceURL: getWorkspaceURL())
     }
     
     public func copyCode(_ id: String) async {
@@ -725,7 +732,7 @@ public final class ChatService: ChatServiceType, ObservableObject {
         
         do {
             if let conversationId = conversationId {
-                try await conversationProvider?.createTurn(with: conversationId, request: request)
+                try await conversationProvider?.createTurn(with: conversationId, request: request, workspaceURL: getWorkspaceURL())
             } else {
                 var requestWithTurns = request
                 
@@ -738,7 +745,7 @@ public final class ChatService: ChatServiceType, ObservableObject {
                     requestWithTurns.turns = turns
                 }
                 
-                try await conversationProvider?.createConversation(requestWithTurns)
+                try await conversationProvider?.createConversation(requestWithTurns, workspaceURL: getWorkspaceURL())
             }
         } catch {
             resetOngoingRequest()

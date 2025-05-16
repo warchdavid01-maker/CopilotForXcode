@@ -6,7 +6,11 @@ import Workspace
 
 public struct ContextUtils {
 
-    public static func getFilesInActiveWorkspace() -> [FileReference] {
+    public static func getFilesInActiveWorkspace(workspaceURL: URL?) -> [FileReference] {
+        if let workspaceURL = workspaceURL, let info = WorkspaceFile.getWorkspaceInfo(workspaceURL: workspaceURL) {
+            return WorkspaceFile.getFilesInActiveWorkspace(workspaceURL: info.workspaceURL, workspaceRootURL: info.projectURL)
+        }
+
         guard let workspaceURL = XcodeInspector.shared.realtimeActiveWorkspaceURL,
               let workspaceRootURL = XcodeInspector.shared.realtimeActiveProjectURL else {
             return []

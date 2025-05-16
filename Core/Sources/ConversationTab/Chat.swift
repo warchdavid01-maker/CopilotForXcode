@@ -66,6 +66,7 @@ struct Chat {
         var fileEditMap: OrderedDictionary<URL, FileEdit> = [:]
         var diffViewerController: DiffViewWindowController? = nil
         var isAgentMode: Bool = AppState.shared.isAgentModeEnabled()
+        var workspaceURL: URL? = nil
         enum Field: String, Hashable {
             case textField
             case fileSearchBar
@@ -564,4 +565,3 @@ private actor TimedDebounceFunction {
         await block()
     }
 }
-

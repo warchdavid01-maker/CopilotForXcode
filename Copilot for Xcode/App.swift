@@ -6,6 +6,7 @@ import SharedUIComponents
 import UpdateChecker
 import XPCShared
 import HostAppActivator
+import ComposableArchitecture
 
 struct VisualEffect: NSViewRepresentable {
   func makeNSView(context: Self.Context) -> NSView { return NSVisualEffectView() }
@@ -192,14 +193,16 @@ struct CopilotForXcodeApp: App {
     }
 
     var body: some Scene {
-        Settings {
-            TabContainer()
-                .frame(minWidth: 800, minHeight: 600)
-                .background(VisualEffect().ignoresSafeArea())
-                .environment(\.updateChecker, UpdateChecker(
-                    hostBundle: Bundle.main,
-                    checkerDelegate: AppUpdateCheckerDelegate()
-                ))
+        WithPerceptionTracking {
+            Settings {
+                TabContainer()
+                    .frame(minWidth: 800, minHeight: 600)
+                    .background(VisualEffect().ignoresSafeArea())
+                    .environment(\.updateChecker, UpdateChecker(
+                        hostBundle: Bundle.main,
+                        checkerDelegate: AppUpdateCheckerDelegate()
+                    ))
+            }
         }
     }
 }
