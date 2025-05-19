@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.35.0 - May 19, 2025
+### Added
+- Launched Agent Mode. Copilot will automatically use multiple requests to edit files, run terminal commands, and fix errors.
+- Introduced Model Context Protocol (MCP) support in Agent Mode, allowing you to configure MCP tools to extend capabilities.
+
+### Changed
+- Added a button to enable/disable referencing current file in conversations
+- Added an animated progress icon in the response section
+- Refined onboarding experience with updated instruction screens and welcome views
+- Improved conversation reliability with extended timeout limits for agent requests
+
+### Fixed
+- Addressed critical error handling issues in core functionality
+- Resolved UI inconsistencies with chat interface padding adjustments
+- Implemented custom certificate handling using system environment variables `NODE_EXTRA_CA_CERTS` and `NODE_TLS_REJECT_UNAUTHORIZED`, fixing network access issues
+
 ## 0.34.0 - April 29, 2025
 ### Added
 - Added support for new models in Chat: OpenAI GPT-4.1, o3 and o4-mini, Gemini 2.5 Pro

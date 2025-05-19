@@ -8,6 +8,18 @@ tool that helps you write code faster and smarter. Copilot for Xcode is an Xcode
 GitHub Copilot Chat provides suggestions to your specific coding tasks via chat.
 <img alt="Chat of GitHub Copilot for Xcode" src="./Docs/chat_dark.gif" width="800" />
 
+## Agent Mode
+
+GitHub Copilot Agent Mode provides AI-powered assistance that can understand and modify your codebase directly. With Agent Mode, you can:
+- Get intelligent code edits applied directly to your files
+- Run terminal commands and view their output without leaving the interface
+- Search through your codebase to find relevant files and code snippets
+- Create new files and directories as needed for your project
+- Get assistance with enhanced context awareness across multiple files and folders
+- Run Model Context Protocol (MCP) tools you configured to extend the capabilities
+
+Agent Mode integrates with Xcode's environment, creating a seamless development experience where Copilot can help implement features, fix bugs, and refactor code with comprehensive understanding of your project.
+
 ## Code Completion
 
 You can receive auto-complete type suggestions from GitHub Copilot either by starting to write the code you want to use, or by writing a natural language comment describing what you want the code to do.
@@ -97,10 +109,6 @@ You can receive auto-complete type suggestions from GitHub Copilot either by sta
 
 1. Press `tab` to accept the first line of a suggestion, hold `option` to view
    the full suggestion, and press `option` + `tab` to accept the full suggestion.
-
-   <p align="center">
-     <img alt="Screenshot of welcome screen" src="./Docs/welcome.png" width="450" />
-   </p>
 
 ## How to use Chat
 

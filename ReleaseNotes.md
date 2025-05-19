@@ -1,14 +1,19 @@
-### GitHub Copilot for Xcode 0.34.0
+### GitHub Copilot for Xcode 0.35.0
 
 **🚀 Highlights**
 
-* **New Models**: OpenAI GPT-4.1, o3 and o4-mini, Gemini 2.5 Pro are now available in the Copilot Chat model selector.
+* **Agent Mode**: Copilot will automatically use multiple requests to edit files, run terminal commands, and fix errors.
+* **Model Context Protocol (MCP)**: Integrated with Agent Mode, allowing you to configure MCP tools to extend capabilities.
 
 **💪 Improvements**
 
-* Switched default model to GPT-4.1 for new installations
-* Enhanced model selection interface
+* Added a button to enable/disable referencing current file in conversations
+* Added an animated progress icon in the response section
+* Refined onboarding experience with updated instruction screens and welcome views
+* Improved conversation reliability with extended timeout limits for agent requests
 
 **🛠️ Bug Fixes**
 
-* Resolved critical error handling issues
+* Addressed critical error handling issues in core functionality
+* Resolved UI inconsistencies with chat interface padding adjustments
+* Improved network access with automatic detection of system environment variables for custom certificates
