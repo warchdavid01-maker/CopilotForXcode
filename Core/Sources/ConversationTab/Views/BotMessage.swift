@@ -18,6 +18,7 @@ struct BotMessage: View {
     let chat: StoreOf<Chat>
     let steps: [ConversationProgressStep]
     let editAgentRounds: [AgentRound]
+    let panelMessages: [CopilotShowMessageParams]
     
     @Environment(\.colorScheme) var colorScheme
     @AppStorage(\.chatFontSize) var chatFontSize
@@ -135,6 +136,14 @@ struct BotMessage: View {
                 // progress step
                 if steps.count > 0 {
                     ProgressStep(steps: steps)
+                }
+                
+                if !panelMessages.isEmpty {
+                    WithPerceptionTracking {
+                        ForEach(panelMessages.indices, id: \.self) { index in
+                            FunctionMessage(text: panelMessages[index].message, chat: chat)
+                        }
+                    }
                 }
                 
                 if editAgentRounds.count > 0 {
@@ -304,7 +313,7 @@ struct BotMessage_Previews: PreviewProvider {
                 status: .running)
             ])
         ]
-    
+
     static var previews: some View {
         let chatTabInfo = ChatTabInfo(id: "id", workspacePath: "path", username: "name")
         BotMessage(
@@ -324,7 +333,8 @@ struct BotMessage_Previews: PreviewProvider {
             errorMessage: "Sorry, an error occurred while generating a response.",
             chat: .init(initialState: .init(), reducer: { Chat(service: ChatService.service(for: chatTabInfo)) }),
             steps: steps,
-            editAgentRounds: agentRounds
+            editAgentRounds: agentRounds,
+            panelMessages: []
         )
         .padding()
         .fixedSize(horizontal: true, vertical: true)

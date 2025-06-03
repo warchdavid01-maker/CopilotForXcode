@@ -127,6 +127,14 @@ enum GitHubCopilotRequest {
             .custom("checkStatus", .hash([:]))
         }
     }
+    
+    struct CheckQuota: GitHubCopilotRequestType {
+        typealias Response = GitHubCopilotQuotaInfo
+
+        var request: ClientRequest {
+            .custom("checkQuota", .hash([:]))
+        }
+    }
 
     struct SignInInitiate: GitHubCopilotRequestType {
         struct Response: Codable {

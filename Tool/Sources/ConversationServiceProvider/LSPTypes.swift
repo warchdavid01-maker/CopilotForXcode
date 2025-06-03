@@ -1,5 +1,6 @@
 import Foundation
 import JSONRPC
+import LanguageServerProtocol
 
 // MARK: Conversation template
 public struct ChatTemplate: Codable, Equatable {
@@ -59,7 +60,7 @@ public struct CopilotModelCapabilitiesSupports: Codable, Equatable {
     public let vision: Bool
 }
 
-public struct CopilotModelBilling: Codable, Equatable {
+public struct CopilotModelBilling: Codable, Equatable, Hashable {
     public let isPremium: Bool
     public let multiplier: Float
 }
@@ -287,3 +288,49 @@ public struct LanguageModelToolConfirmationResult: Codable, Equatable {
 }
 
 public typealias InvokeClientToolConfirmationRequest = JSONRPCRequest<InvokeClientToolParams>
+
+// MARK: CLS ShowMessage Notification
+public struct CopilotShowMessageParams: Codable, Equatable, Hashable {
+    public var type: MessageType
+    public var title: String
+    public var message: String
+    public var actions: [CopilotMessageActionItem]?
+    public var location: CopilotMessageLocation
+    public var panelContext: CopilotMessagePanelContext?
+    
+    public init(
+        type: MessageType,
+        title: String,
+        message: String,
+        actions: [CopilotMessageActionItem]? = nil,
+        location: CopilotMessageLocation,
+        panelContext: CopilotMessagePanelContext? = nil
+    ) {
+        self.type = type
+        self.title = title
+        self.message = message
+        self.actions = actions
+        self.location = location
+        self.panelContext = panelContext
+    }
+}
+
+public enum CopilotMessageLocation: String, Codable, Equatable, Hashable {
+    case Panel = "Panel"
+    case Inline = "Inline"
+}
+
+public struct CopilotMessagePanelContext: Codable, Equatable, Hashable {
+    public var conversationId: String
+    public var turnId: String
+}
+
+public struct CopilotMessageActionItem: Codable, Equatable, Hashable {
+    public var title: String
+    public var command: ActionCommand?
+}
+
+public struct ActionCommand: Codable, Equatable, Hashable {
+    public var commandId: String
+    public var args: LSPAny?
+}

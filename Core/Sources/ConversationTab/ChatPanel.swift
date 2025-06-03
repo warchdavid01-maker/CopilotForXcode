@@ -37,9 +37,7 @@ public struct ChatPanel: View {
                         .accessibilityElement(children: .combine)
                         .accessibilityLabel("Chat Messages Group")
                     
-                    if chat.history.last?.role == .system {
-                        ChatCLSError(chat: chat).padding(.trailing, 16)
-                    } else if (chat.history.last?.followUp) != nil {
+                    if let _ = chat.history.last?.followUp {
                         ChatFollowUp(chat: chat)
                             .padding(.trailing, 16)
                             .padding(.vertical, 8)
@@ -344,10 +342,9 @@ struct ChatHistoryItem: View {
                     errorMessage: message.errorMessage,
                     chat: chat,
                     steps: message.steps,
-                    editAgentRounds: message.editAgentRounds
+                    editAgentRounds: message.editAgentRounds,
+                    panelMessages: message.panelMessages
                 )
-            case .system:
-                FunctionMessage(chat: chat, id: message.id, text: text)
             case .ignored:
                 EmptyView()
             }
@@ -516,8 +513,7 @@ struct ChatPanelInputArea: View {
                                         submitChatMessage()
                                     }
                                     dropDownShowingType = nil
-                                },
-                                completions: chatAutoCompletion
+                                }
                             )
                             .focused(focusedField, equals: .textField)
                             .bind($chat.focusedField, to: focusedField)
@@ -800,11 +796,7 @@ struct ChatPanelInputArea: View {
             if !chat.isAgentMode {
                 promptTemplates = await SharedChatService.shared.loadChatTemplates() ?? []
             }
-            
-            guard !promptTemplates.isEmpty else {
-                return [releaseNotesTemplate]
-            }
-            
+
             let templates = promptTemplates + [releaseNotesTemplate]
             let skippedTemplates = [ "feedback", "help" ]
             
@@ -831,29 +823,6 @@ struct ChatPanelInputArea: View {
             return chatAgents.filter { $0.slug.hasPrefix(prefix) && includedAgents.contains($0.slug) }
         }
 
-        func chatAutoCompletion(text: String, proposed: [String], range: NSRange) -> [String] {
-            guard text.count == 1 else { return [] }
-            let plugins = [String]() // chat.pluginIdentifiers.map { "/\($0)" }
-            let availableFeatures = plugins + [
-//                "/exit",
-                "@code",
-                "@sense",
-                "@project",
-                "@web",
-            ]
-
-            let result: [String] = availableFeatures
-                .filter { $0.hasPrefix(text) && $0 != text }
-                .compactMap {
-                    guard let index = $0.index(
-                        $0.startIndex,
-                        offsetBy: range.location,
-                        limitedBy: $0.endIndex
-                    ) else { return nil }
-                    return String($0[index...])
-                }
-            return result
-        }
         func subscribeToActiveDocumentChangeEvent() {
             Publishers.CombineLatest(
                 XcodeInspector.shared.$latestActiveXcode,

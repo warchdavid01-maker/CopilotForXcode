@@ -24,7 +24,7 @@ public final class WatchedFilesHandlerImpl: WatchedFilesHandler {
             projectURL: projectURL,
             excludeGitIgnoredFiles: params.excludeGitignoredFiles,
             excludeIDEIgnoredFiles: params.excludeIDEIgnoredFiles
-        )
+        ).prefix(10000) // Set max number of indexing file to 10000
         
         let batchSize = BatchingFileChangeWatcher.maxEventPublishSize
         /// only `batchSize`(100) files to complete this event for setup watching workspace in CLS side

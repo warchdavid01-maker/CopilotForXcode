@@ -107,6 +107,7 @@ public class GitHubCopilotViewModel: ObservableObject {
                 status = try await service.signOut()
                 await Status.shared.updateAuthStatus(.notLoggedIn)
                 await Status.shared.updateCLSStatus(.unknown, busy: false, message: "")
+                await Status.shared.updateQuotaInfo(nil)
                 username = ""
                 broadcastStatusChange()
             } catch {

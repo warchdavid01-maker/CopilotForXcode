@@ -65,7 +65,12 @@ public final class BuiltinExtensionConversationServiceProvider<
             return
         }
         
-        try await conversationService.createTurn(with: conversationId, request: request, workspace: workspaceInfo)
+        try await conversationService
+            .createTurn(
+                with: conversationId,
+                request: request,
+                workspace: workspaceInfo
+            )
     }
 
     public func stopReceivingMessage(_ workDoneToken: String, workspaceURL: URL?) async throws {

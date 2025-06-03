@@ -15,6 +15,7 @@ extension ChatMessage {
         var errorMessage: String?
         var steps: [ConversationProgressStep]
         var editAgentRounds: [AgentRound]
+        var panelMessages: [CopilotShowMessageParams]
 
         // Custom decoder to provide default value for steps
         init(from decoder: Decoder) throws {
@@ -27,10 +28,21 @@ extension ChatMessage {
             errorMessage = try container.decodeIfPresent(String.self, forKey: .errorMessage)
             steps = try container.decodeIfPresent([ConversationProgressStep].self, forKey: .steps) ?? []
             editAgentRounds = try container.decodeIfPresent([AgentRound].self, forKey: .editAgentRounds) ?? []
+            panelMessages = try container.decodeIfPresent([CopilotShowMessageParams].self, forKey: .panelMessages) ?? []
         }
 
         // Default memberwise init for encoding
-        init(content: String, rating: ConversationRating, references: [ConversationReference], followUp: ConversationFollowUp?, suggestedTitle: String?, errorMessage: String?, steps: [ConversationProgressStep]?, editAgentRounds: [AgentRound]? = nil) {
+        init(
+            content: String,
+            rating: ConversationRating,
+            references: [ConversationReference],
+            followUp: ConversationFollowUp?,
+            suggestedTitle: String?,
+            errorMessage: String?,
+            steps: [ConversationProgressStep]?,
+            editAgentRounds: [AgentRound]? = nil,
+            panelMessages: [CopilotShowMessageParams]? = nil
+        ) {
             self.content = content
             self.rating = rating
             self.references = references
@@ -39,6 +51,7 @@ extension ChatMessage {
             self.errorMessage = errorMessage
             self.steps = steps ?? []
             self.editAgentRounds = editAgentRounds ?? []
+            self.panelMessages = panelMessages ?? []
         }
     }
     
@@ -51,7 +64,8 @@ extension ChatMessage {
             suggestedTitle: self.suggestedTitle,
             errorMessage: self.errorMessage,
             steps: self.steps,
-            editAgentRounds: self.editAgentRounds
+            editAgentRounds: self.editAgentRounds,
+            panelMessages: self.panelMessages
         )
         
         // TODO: handle exception
@@ -83,6 +97,7 @@ extension ChatMessage {
                     rating: turnItemData.rating,
                     steps: turnItemData.steps,
                     editAgentRounds: turnItemData.editAgentRounds,
+                    panelMessages: turnItemData.panelMessages,
                     createdAt: turnItem.createdAt,
                     updatedAt: turnItem.updatedAt
                 )

@@ -1,7 +1,7 @@
 {
   "images" : [
     {
-      "filename" : "Status=warning, Mode=dark.svg",
+      "filename" : "Status=error, Mode=dark.svg",
       "idiom" : "universal"
     }
   ],

@@ -9,6 +9,10 @@ import ConversationServiceProvider
 public let SELECTED_LLM_KEY = "selectedLLM"
 public let SELECTED_CHATMODE_KEY = "selectedChatMode"
 
+extension Notification.Name {
+    static let gitHubCopilotSelectedModelDidChange = Notification.Name("com.github.CopilotForXcode.SelectedModelDidChange")
+}
+
 extension AppState {
     func getSelectedModelFamily() -> String? {
         if let savedModel = get(key: SELECTED_LLM_KEY),
@@ -28,6 +32,7 @@ extension AppState {
 
     func setSelectedModel(_ model: LLMModel) {
         update(key: SELECTED_LLM_KEY, value: model)
+        NotificationCenter.default.post(name: .gitHubCopilotSelectedModelDidChange, object: nil)
     }
 
     func modelScope() -> PromptTemplateScope {
@@ -76,6 +81,7 @@ class CopilotModelManagerObservable: ObservableObject {
         defaultChatModel = CopilotModelManager.getDefaultChatModel(scope: .chatPanel)
         defaultAgentModel = CopilotModelManager.getDefaultChatModel(scope: .agentPanel)
         
+        
         // Setup notification to update when models change
         NotificationCenter.default.publisher(for: .gitHubCopilotModelsDidChange)
             .receive(on: DispatchQueue.main)
@@ -84,6 +90,24 @@ class CopilotModelManagerObservable: ObservableObject {
                 self?.availableAgentModels = CopilotModelManager.getAvailableChatLLMs(scope: .agentPanel)
                 self?.defaultChatModel = CopilotModelManager.getDefaultChatModel(scope: .chatPanel)
                 self?.defaultAgentModel = CopilotModelManager.getDefaultChatModel(scope: .agentPanel)
+            }
+            .store(in: &cancellables)
+        
+        NotificationCenter.default.publisher(for: .gitHubCopilotShouldSwitchFallbackModel)
+            .receive(on: DispatchQueue.main)
+            .sink { _ in
+                if let fallbackModel = CopilotModelManager.getFallbackLLM(
+                    scope: AppState.shared
+                        .isAgentModeEnabled() ? .agentPanel : .chatPanel
+                ) {
+                    AppState.shared.setSelectedModel(
+                        .init(
+                            modelName: fallbackModel.modelName,
+                            modelFamily: fallbackModel.id,
+                            billing: fallbackModel.billing
+                        )
+                    )
+                }
             }
             .store(in: &cancellables)
     }
@@ -95,7 +119,11 @@ extension CopilotModelManager {
         return LLMs.filter(
             { $0.scopes.contains(scope) }
         ).map {
-            LLMModel(modelName: $0.modelName, modelFamily: $0.modelFamily)
+            return LLMModel(
+                modelName: $0.modelName,
+                modelFamily: $0.isChatFallback ? $0.id : $0.modelFamily,
+                billing: $0.billing
+            )
         }
     }
 
@@ -105,18 +133,30 @@ extension CopilotModelManager {
         let defaultModel = LLMsInScope.first(where: { $0.isChatDefault })
         // If a default model is found, return it
         if let defaultModel = defaultModel {
-            return LLMModel(modelName: defaultModel.modelName, modelFamily: defaultModel.modelFamily)
+            return LLMModel(
+                modelName: defaultModel.modelName,
+                modelFamily: defaultModel.modelFamily,
+                billing: defaultModel.billing
+            )
         }
 
         // Fallback to gpt-4.1 if available
         let gpt4_1 = LLMsInScope.first(where: { $0.modelFamily == "gpt-4.1" })
         if let gpt4_1 = gpt4_1 {
-            return LLMModel(modelName: gpt4_1.modelName, modelFamily: gpt4_1.modelFamily)
+            return LLMModel(
+                modelName: gpt4_1.modelName,
+                modelFamily: gpt4_1.modelFamily,
+                billing: gpt4_1.billing
+            )
         }
 
         // If no default model is found, fallback to the first available model
         if let firstModel = LLMsInScope.first {
-            return LLMModel(modelName: firstModel.modelName, modelFamily: firstModel.modelFamily)
+            return LLMModel(
+                modelName: firstModel.modelName,
+                modelFamily: firstModel.modelFamily,
+                billing: firstModel.billing
+            )
         }
 
         return nil
@@ -126,6 +166,7 @@ extension CopilotModelManager {
 struct LLMModel: Codable, Hashable {
     let modelName: String
     let modelFamily: String
+    let billing: CopilotModelBilling?
 }
 
 struct ModelPicker: View {
@@ -167,10 +208,8 @@ struct ModelPicker: View {
             if !newModeModels.isEmpty && !newModeModels.contains(where: { $0.modelName == currentModel }) {
                 let defaultModel = CopilotModelManager.getDefaultChatModel(scope: scope)
                 if let defaultModel = defaultModel {
-                    selectedModel = defaultModel.modelName
                     AppState.shared.setSelectedModel(defaultModel)
                 } else {
-                    selectedModel = newModeModels[0].modelName
                     AppState.shared.setSelectedModel(newModeModels[0])
                 }
             }
@@ -179,7 +218,58 @@ struct ModelPicker: View {
         // Force refresh models
         self.updateCurrentModel()
     }
-
+    
+    // Model picker menu component
+    private var modelPickerMenu: some View {
+        Menu(selectedModel) {
+            // Group models by premium status
+            let premiumModels = models.filter { $0.billing?.isPremium == true }
+            let standardModels = models.filter { $0.billing?.isPremium == false || $0.billing == nil }
+            
+            // Display standard models section if available
+            modelSection(title: "Standard Models", models: standardModels)
+            
+            // Display premium models section if available
+            modelSection(title: "Premium Models", models: premiumModels)
+        }
+        .menuStyle(BorderlessButtonMenuStyle())
+        .frame(maxWidth: labelWidth())
+        .padding(4)
+        .background(
+            RoundedRectangle(cornerRadius: 5)
+                .fill(isHovered ? Color.gray.opacity(0.1) : Color.clear)
+        )
+        .onHover { hovering in
+            isHovered = hovering
+        }
+    }
+    
+    // Helper function to create a section of model options
+    @ViewBuilder
+    private func modelSection(title: String, models: [LLMModel]) -> some View {
+        if !models.isEmpty {
+            Section(title) {
+                ForEach(models, id: \.self) { model in
+                    modelButton(for: model)
+                }
+            }
+        }
+    }
+    
+    // Helper function to create a model selection button
+    private func modelButton(for model: LLMModel) -> some View {
+        Button {
+            AppState.shared.setSelectedModel(model)
+        } label: {
+            Text(createModelMenuItemAttributedString(
+                modelName: model.modelName,
+                isSelected: selectedModel == model.modelName,
+                billing: model.billing
+            ))
+        }
+    }
+    
+    // Main view body
     var body: some View {
         WithPerceptionTracking {
             HStack(spacing: 0) {
@@ -189,34 +279,10 @@ struct ModelPicker: View {
                         updateAgentPicker()
                     }
                 
-                Group{
-                    // Model Picker
+                // Model Picker
+                Group {
                     if !models.isEmpty && !selectedModel.isEmpty {
-                        
-                        Menu(selectedModel) {
-                            ForEach(models, id: \.self) { option in
-                                Button {
-                                    selectedModel = option.modelName
-                                    AppState.shared.setSelectedModel(option)
-                                } label: {
-                                    if selectedModel == option.modelName {
-                                        Text("✓ \(option.modelName)")
-                                    } else {
-                                        Text("    \(option.modelName)")
-                                    }
-                                }
-                            }
-                        }
-                        .menuStyle(BorderlessButtonMenuStyle())
-                        .frame(maxWidth: labelWidth())
-                        .padding(4)
-                        .background(
-                            RoundedRectangle(cornerRadius: 5)
-                                .fill(isHovered ? Color.gray.opacity(0.1) : Color.clear)
-                        )
-                        .onHover { hovering in
-                            isHovered = hovering
-                        }
+                        modelPickerMenu
                     } else {
                         EmptyView()
                     }
@@ -237,6 +303,9 @@ struct ModelPicker: View {
             .onChange(of: chatMode) { _ in
                 updateCurrentModel()
             }
+            .onReceive(NotificationCenter.default.publisher(for: .gitHubCopilotSelectedModelDidChange)) { _ in
+                updateCurrentModel()
+            }
         }
     }
 
@@ -244,13 +313,6 @@ struct ModelPicker: View {
         let font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
         let attributes = [NSAttributedString.Key.font: font]
         let width = selectedModel.size(withAttributes: attributes).width
-        return CGFloat(width + 20)
-    }
-
-    func agentPickerLabelWidth() -> CGFloat {
-        let font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
-        let attributes = [NSAttributedString.Key.font: font]
-        let width = chatMode.size(withAttributes: attributes).width
         return CGFloat(width + 20)
     }
 
@@ -266,6 +328,52 @@ struct ModelPicker: View {
         if !copilotModels.isEmpty {
             CopilotModelManager.updateLLMs(copilotModels)
         }
+    }
+
+    private func createModelMenuItemAttributedString(modelName: String, isSelected: Bool, billing: CopilotModelBilling?) -> AttributedString {
+        let displayName = isSelected ? "✓ \(modelName)" : "    \(modelName)"
+        let font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+        let attributes: [NSAttributedString.Key: Any] = [.font: font]
+        let spaceWidth = "\u{200A}".size(withAttributes: attributes).width
+
+        let targetXPositionForMultiplier: CGFloat = 230
+
+        var fullString = displayName
+        var attributedString = AttributedString(fullString)
+
+        if let billingInfo = billing {
+            let multiplier = billingInfo.multiplier
+            
+            let effectiveMultiplierText: String
+            if multiplier == 0 {
+                effectiveMultiplierText = "Included"
+            } else {
+                let numberPart = multiplier.truncatingRemainder(dividingBy: 1) == 0
+                    ? String(format: "%.0f", multiplier)
+                    : String(format: "%.2f", multiplier)
+                effectiveMultiplierText = "\(numberPart)x"
+            }
+
+            let displayNameWidth = displayName.size(withAttributes: attributes).width
+            let multiplierTextWidth = effectiveMultiplierText.size(withAttributes: attributes).width
+            let neededPaddingWidth = targetXPositionForMultiplier - displayNameWidth - multiplierTextWidth
+            
+            if neededPaddingWidth > 0 {
+                let numberOfSpaces = Int(round(neededPaddingWidth / spaceWidth))
+                let padding = String(repeating: "\u{200A}", count: max(0, numberOfSpaces))
+                fullString = "\(displayName)\(padding)\(effectiveMultiplierText)"
+            } else {
+                fullString = "\(displayName) \(effectiveMultiplierText)"
+            }
+            
+            attributedString = AttributedString(fullString)
+
+            if let range = attributedString.range(of: effectiveMultiplierText) {
+                attributedString[range].foregroundColor = .secondary
+            }
+        }
+
+        return attributedString
     }
 }
 

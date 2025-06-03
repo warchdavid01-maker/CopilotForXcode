@@ -34,6 +34,7 @@ struct ConversationCreateParams: Codable {
     var model: String?
     var chatMode: String?
     var needToolCallConfirmation: Bool?
+    var userLanguage: String?
 
     struct Capabilities: Codable {
         var skills: [String]
@@ -131,6 +132,7 @@ struct ConversationTurn: Codable {
 struct TurnCreateParams: Codable {
     var workDoneToken: String
     var conversationId: String
+    var turnId: String?
     var message: String
     var textDocument: Doc?
     var ignoredSkills: [String]?

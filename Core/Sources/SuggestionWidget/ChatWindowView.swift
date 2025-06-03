@@ -499,7 +499,7 @@ struct ChatWindowView_Previews: PreviewProvider {
                                 .init(id: "7", title: "Empty-7", workspacePath: "path", username: "username"),
                             ] as IdentifiedArray<String, ChatTabInfo>,
                             selectedTabId: "2"
-                        )
+                        ) { _ in }
                     ] as IdentifiedArray<WorkspaceIdentifier, ChatWorkspace>,
                     selectedWorkspacePath: "activeWorkspacePath",
                     selectedWorkspaceName: "activeWorkspacePath"

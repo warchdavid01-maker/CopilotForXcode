@@ -13,7 +13,9 @@ struct RunInTerminalToolView: View {
     private var title: String = "Run command in terminal"
 
     @AppStorage(\.codeBackgroundColorLight) var codeBackgroundColorLight
+    @AppStorage(\.codeForegroundColorLight) var codeForegroundColorLight
     @AppStorage(\.codeBackgroundColorDark) var codeBackgroundColorDark
+    @AppStorage(\.codeForegroundColorDark) var codeForegroundColorDark
     @AppStorage(\.chatFontSize) var chatFontSize
     @AppStorage(\.chatCodeFont) var chatCodeFont
     @Environment(\.colorScheme) var colorScheme
@@ -102,6 +104,15 @@ struct RunInTerminalToolView: View {
         return Color(nsColor: .textBackgroundColor).opacity(0.7)
     }
 
+    var codeForegroundColor: Color {
+        if colorScheme == .light, let color = codeForegroundColorLight.value {
+            return color.swiftUIColor
+        } else if let color = codeForegroundColorDark.value {
+            return color.swiftUIColor
+        }
+        return Color(nsColor: .textColor)
+    }
+
     var toolView: some View {
         WithPerceptionTracking {
             VStack {
@@ -115,7 +126,7 @@ struct RunInTerminalToolView: View {
                             .font(.system(size: chatFontSize, design: .monospaced))
                             .padding(8)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(codeForegroundColor)
                             .background(codeBackgroundColor)
                             .clipShape(RoundedRectangle(cornerRadius: 6))
                             .overlay {

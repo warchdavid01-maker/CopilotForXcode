@@ -132,6 +132,23 @@ public class ConversationTab: ChatTab {
         super.init(store: store)
     }
     
+    deinit {
+        // Cancel all Combine subscriptions
+        cancellable.forEach { $0.cancel() }
+        cancellable.removeAll()
+        
+        // Stop the debounce runner
+        Task { @MainActor [weak self] in
+            await self?.updateContentDebounce.cancel()
+        }
+        
+        // Clear observer
+        observer = NSObject()
+        
+        // The deallocation of ChatService will be called automatically
+        // The TCA Store (chat) handles its own cleanup automatically
+    }
+    
     @MainActor
     public static func restoreConversation(by chatTabInfo: ChatTabInfo, store: StoreOf<ChatTabItem>) -> ConversationTab {
         let service = ChatService.service(for: chatTabInfo)

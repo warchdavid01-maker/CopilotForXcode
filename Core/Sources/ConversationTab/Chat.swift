@@ -15,7 +15,6 @@ public struct DisplayedChatMessage: Equatable {
     public enum Role: Equatable {
         case user
         case assistant
-        case system
         case ignored
     }
 
@@ -28,8 +27,20 @@ public struct DisplayedChatMessage: Equatable {
     public var errorMessage: String? = nil
     public var steps: [ConversationProgressStep] = []
     public var editAgentRounds: [AgentRound] = []
+    public var panelMessages: [CopilotShowMessageParams] = []
 
-    public init(id: String, role: Role, text: String, references: [ConversationReference] = [], followUp: ConversationFollowUp? = nil, suggestedTitle: String? = nil, errorMessage: String? = nil, steps: [ConversationProgressStep] = [], editAgentRounds: [AgentRound] = []) {
+    public init(
+        id: String,
+        role: Role,
+        text: String,
+        references: [ConversationReference] = [],
+        followUp: ConversationFollowUp? = nil,
+        suggestedTitle: String? = nil,
+        errorMessage: String? = nil,
+        steps: [ConversationProgressStep] = [],
+        editAgentRounds: [AgentRound] = [],
+        panelMessages: [CopilotShowMessageParams] = []
+    ) {
         self.id = id
         self.role = role
         self.text = text
@@ -39,6 +50,7 @@ public struct DisplayedChatMessage: Equatable {
         self.errorMessage = errorMessage
         self.steps = steps
         self.editAgentRounds = editAgentRounds
+        self.panelMessages = panelMessages
     }
 }
 
@@ -137,6 +149,7 @@ struct Chat {
 
     @Dependency(\.openURL) var openURL
     @AppStorage(\.enableCurrentEditorContext) var enableCurrentEditorContext: Bool
+    @AppStorage(\.chatResponseLocale) var chatResponseLocale
 
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -180,7 +193,7 @@ struct Chat {
                 let selectedModelFamily = AppState.shared.getSelectedModelFamily() ?? CopilotModelManager.getDefaultChatModel(scope: AppState.shared.modelScope())?.modelFamily
                 let agentMode = AppState.shared.isAgentModeEnabled()
                 return .run { _ in
-                    try await service.send(id, content: message, skillSet: skillSet, references: selectedFiles, model: selectedModelFamily, agentMode: agentMode)
+                    try await service.send(id, content: message, skillSet: skillSet, references: selectedFiles, model: selectedModelFamily, agentMode: agentMode, userLanguage: chatResponseLocale)
                 }.cancellable(id: CancelID.sendMessage(self.id))
             
             case let .toolCallAccepted(toolCallId):
@@ -209,7 +222,7 @@ struct Chat {
                 let selectedModelFamily = AppState.shared.getSelectedModelFamily() ?? CopilotModelManager.getDefaultChatModel(scope: AppState.shared.modelScope())?.modelFamily
                 
                 return .run { _ in
-                    try await service.send(id, content: message, skillSet: skillSet, references: selectedFiles, model: selectedModelFamily)
+                    try await service.send(id, content: message, skillSet: skillSet, references: selectedFiles, model: selectedModelFamily, userLanguage: chatResponseLocale)
                 }.cancellable(id: CancelID.sendMessage(self.id))
 
             case .returnButtonTapped:
@@ -343,9 +356,9 @@ struct Chat {
                         id: message.id,
                         role: {
                             switch message.role {
-                            case .system: return .system
                             case .user: return .user
                             case .assistant: return .assistant
+                            case .system: return .ignored
                             }
                         }(),
                         text: message.content,
@@ -360,7 +373,8 @@ struct Chat {
                         suggestedTitle: message.suggestedTitle,
                         errorMessage: message.errorMessage,
                         steps: message.steps,
-                        editAgentRounds: message.editAgentRounds
+                        editAgentRounds: message.editAgentRounds,
+                        panelMessages: message.panelMessages
                     ))
 
                     return all

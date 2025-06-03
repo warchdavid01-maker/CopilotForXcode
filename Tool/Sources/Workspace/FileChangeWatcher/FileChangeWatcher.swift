@@ -203,6 +203,7 @@ public final class BatchingFileChangeWatcher: FileChangeWatcher {
         fsEventProvider.invalidateStream(eventStream)
         fsEventProvider.releaseStream(eventStream)
         self.eventStream = nil
+        
         isWatching = false
         
         Logger.client.info("Stoped watching for file changes in \(watchedPaths)")
@@ -267,7 +268,7 @@ public class FileChangeWatcherService {
     internal var watcher: BatchingFileChangeWatcher?
     /// for watching projects added or removed
     private var timer: Timer?
-    private var projectWatchingInterval: TimeInterval = 3.0
+    private var projectWatchingInterval: TimeInterval
     
     private(set) public var workspaceURL: URL
     private(set) public var publisher: PublisherType
@@ -280,7 +281,7 @@ public class FileChangeWatcherService {
         _ workspaceURL: URL,
         publisher: @escaping PublisherType,
         publishInterval: TimeInterval = 3.0,
-        projectWatchingInterval: TimeInterval = 3.0,
+        projectWatchingInterval: TimeInterval = 300.0,
         workspaceFileProvider: WorkspaceFileProvider = FileChangeWatcherWorkspaceFileProvider(),
         watcherFactory: (([URL], @escaping PublisherType) -> BatchingFileChangeWatcher)? = nil
     ) {
@@ -290,6 +291,7 @@ public class FileChangeWatcherService {
         self.watcherFactory = watcherFactory ?? { projectURLs, publisher in
             BatchingFileChangeWatcher(watchedPaths: projectURLs, changePublisher: publisher, publishInterval: publishInterval)
         }
+        self.projectWatchingInterval = projectWatchingInterval
     }
     
     deinit {

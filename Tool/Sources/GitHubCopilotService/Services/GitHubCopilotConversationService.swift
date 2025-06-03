@@ -33,7 +33,8 @@ public final class GitHubCopilotConversationService: ConversationServiceType {
                                                     references: request.references ?? [],
                                                     model: request.model,
                                                     turns: request.turns,
-                                                    agentMode: request.agentMode)
+                                                    agentMode: request.agentMode,
+                                                    userLanguage: request.userLanguage)
     }
     
     public func createTurn(with conversationId: String, request: ConversationRequest, workspace: WorkspaceInfo) async throws {
@@ -42,6 +43,7 @@ public final class GitHubCopilotConversationService: ConversationServiceType {
         return try await service.createTurn(request.content,
                                             workDoneToken: request.workDoneToken,
                                             conversationId: conversationId,
+                                            turnId: request.turnId,
                                             activeDoc: request.activeDoc,
                                             ignoredSkills: request.ignoredSkills,
                                             references: request.references ?? [],

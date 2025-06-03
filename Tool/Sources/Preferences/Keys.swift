@@ -295,6 +295,10 @@ public extension UserDefaultPreferenceKeys {
     var enableCurrentEditorContext: PreferenceKey<Bool> {
         .init(defaultValue: true, key: "EnableCurrentEditorContext")
     }
+    
+    var chatResponseLocale: PreferenceKey<String> {
+        .init(defaultValue: "en", key: "ChatResponseLocale")
+    }
 }
 
 // MARK: - Theme

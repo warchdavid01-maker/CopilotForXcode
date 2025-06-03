@@ -15,6 +15,7 @@ import Persist
 
 public protocol GitHubCopilotAuthServiceType {
     func checkStatus() async throws -> GitHubCopilotAccountStatus
+    func checkQuota() async throws -> GitHubCopilotQuotaInfo
     func signInInitiate() async throws -> (status: SignInInitiateStatus, verificationUri: String?, userCode: String?, user: String?)
     func signInConfirm(userCode: String) async throws
         -> (username: String, status: GitHubCopilotAccountStatus)
@@ -62,10 +63,12 @@ public protocol GitHubCopilotConversationServiceType {
                             references: [FileReference],
                             model: String?,
                             turns: [TurnSchema],
-                            agentMode: Bool) async throws
+                            agentMode: Bool,
+                            userLanguage: String?) async throws
     func createTurn(_ message: String,
                     workDoneToken: String,
                     conversationId: String,
+                    turnId: String?,
                     activeDoc: Doc?,
                     ignoredSkills: [String]?,
                     references: [FileReference],
@@ -587,7 +590,8 @@ public final class GitHubCopilotService:
                                    references: [FileReference],
                                    model: String?,
                                    turns: [TurnSchema],
-                                   agentMode: Bool) async throws {
+                                   agentMode: Bool,
+                                   userLanguage: String?) async throws {
         var conversationCreateTurns: [ConversationTurn] = []
         // invoke conversation history
         if turns.count > 0 {
@@ -618,7 +622,8 @@ public final class GitHubCopilotService:
                                               ignoredSkills: ignoredSkills,
                                               model: model,
                                               chatMode: agentMode ? "Agent" : nil,
-                                              needToolCallConfirmation: true)
+                                              needToolCallConfirmation: true,
+                                              userLanguage: userLanguage)
         do {
             _ = try await sendRequest(
                 GitHubCopilotRequest.CreateConversation(params: params), timeout: conversationRequestTimeout(agentMode))
@@ -629,10 +634,21 @@ public final class GitHubCopilotService:
     }
 
     @GitHubCopilotSuggestionActor
-    public func createTurn(_ message: String, workDoneToken: String, conversationId: String, activeDoc: Doc?, ignoredSkills: [String]?, references: [FileReference], model: String?, workspaceFolder: String, workspaceFolders: [WorkspaceFolder]? = nil, agentMode: Bool) async throws {
+    public func createTurn(_ message: String,
+                           workDoneToken: String,
+                           conversationId: String,
+                           turnId: String?,
+                           activeDoc: Doc?,
+                           ignoredSkills: [String]?,
+                           references: [FileReference],
+                           model: String?,
+                           workspaceFolder: String,
+                           workspaceFolders: [WorkspaceFolder]? = nil,
+                           agentMode: Bool) async throws {
         do {
             let params = TurnCreateParams(workDoneToken: workDoneToken,
                                           conversationId: conversationId,
+                                          turnId: turnId,
                                           message: message,
                                           textDocument: activeDoc,
                                           ignoredSkills: ignoredSkills,
@@ -855,6 +871,19 @@ public final class GitHubCopilotService:
             let response = try await sendRequest(GitHubCopilotRequest.CheckStatus())
             await updateServiceAuthStatus(response)
             return response.status
+        } catch let error as ServerError {
+            throw GitHubCopilotError.languageServerError(error)
+        } catch {
+            throw error
+        }
+    }
+    
+    @GitHubCopilotSuggestionActor
+    public func checkQuota() async throws -> GitHubCopilotQuotaInfo {
+        do {
+            let response = try await sendRequest(GitHubCopilotRequest.CheckQuota())
+            await Status.shared.updateQuotaInfo(response)
+            return response
         } catch let error as ServerError {
             throw GitHubCopilotError.languageServerError(error)
         } catch {

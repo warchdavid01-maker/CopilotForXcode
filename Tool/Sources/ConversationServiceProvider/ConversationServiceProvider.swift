@@ -96,6 +96,8 @@ public struct ConversationRequest {
     public var model: String?
     public var turns: [TurnSchema]
     public var agentMode: Bool = false
+    public var userLanguage: String? = nil
+    public var turnId: String? = nil
 
     public init(
         workDoneToken: String,
@@ -107,7 +109,9 @@ public struct ConversationRequest {
         references: [FileReference]? = nil,
         model: String? = nil,
         turns: [TurnSchema] = [],
-        agentMode: Bool = false
+        agentMode: Bool = false,
+        userLanguage: String?,
+        turnId: String? = nil
     ) {
         self.workDoneToken = workDoneToken
         self.content = content
@@ -119,6 +123,8 @@ public struct ConversationRequest {
         self.model = model
         self.turns = turns
         self.agentMode = agentMode
+        self.userLanguage = userLanguage
+        self.turnId = turnId
     }
 }
 

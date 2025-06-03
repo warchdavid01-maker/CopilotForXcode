@@ -17,7 +17,7 @@ import OrderedCollections
 
 public protocol ChatServiceType {
     var memory: ContextAwareAutoManagedChatMemory { get set }
-    func send(_ id: String, content: String, skillSet: [ConversationSkill], references: [FileReference], model: String?, agentMode: Bool) async throws
+    func send(_ id: String, content: String, skillSet: [ConversationSkill], references: [FileReference], model: String?, agentMode: Bool, userLanguage: String?, turnId: String?) async throws
     func stopReceivingMessage() async
     func upvote(_ id: String, _ rating: ConversationRating) async
     func downvote(_ id: String, _ rating: ConversationRating) async
@@ -79,6 +79,7 @@ public final class ChatService: ChatServiceType, ObservableObject {
     private var activeRequestId: String?
     private(set) public var conversationId: String?
     private var skillSet: [ConversationSkill] = []
+    private var lastUserRequest: ConversationRequest?
     private var isRestored: Bool = false
     private var pendingToolCallRequests: [String: ToolCallRequest] = [:]
     init(provider: any ConversationServiceProvider,
@@ -96,6 +97,18 @@ public final class ChatService: ChatServiceType, ObservableObject {
         subscribeToWatchedFilesHandler()
         subscribeToClientToolInvokeEvent()
         subscribeToClientToolConfirmationEvent()
+    }
+    
+    deinit {
+        Task { [weak self] in
+            await self?.stopReceivingMessage()
+        }
+        
+        // Clear all subscriptions
+        cancellables.forEach { $0.cancel() }
+        cancellables.removeAll()
+        
+        // Memory will be deallocated automatically
     }
     
     private func subscribeToNotifications() {
@@ -303,7 +316,16 @@ public final class ChatService: ChatServiceType, ObservableObject {
         }
     }
 
-    public func send(_ id: String, content: String, skillSet: Array<ConversationSkill>, references: Array<FileReference>, model: String? = nil, agentMode: Bool = false) async throws {
+    public func send(
+        _ id: String,
+        content: String,
+        skillSet: Array<ConversationSkill>,
+        references: Array<FileReference>,
+        model: String? = nil,
+        agentMode: Bool = false,
+        userLanguage: String? = nil,
+        turnId: String? = nil
+    ) async throws {
         guard activeRequestId == nil else { return }
         let workDoneToken = UUID().uuidString
         activeRequestId = workDoneToken
@@ -315,11 +337,15 @@ public final class ChatService: ChatServiceType, ObservableObject {
             content: content,
             references: references.toConversationReferences()
         )
-        await memory.appendMessage(chatMessage)
+        
+        // If turnId is provided, it is used to update the existing message, no need to append the user message
+        if turnId == nil {
+            await memory.appendMessage(chatMessage)
+        }
         
         // reset file edits
         self.resetFileEdits()
-        
+            
         // persist
         saveChatMessageToStorage(chatMessage)
         
@@ -363,7 +389,11 @@ public final class ChatService: ChatServiceType, ObservableObject {
                                           ignoredSkills: ignoredSkills,
                                           references: references,
                                           model: model,
-                                          agentMode: agentMode)
+                                          agentMode: agentMode,
+                                          userLanguage: userLanguage,
+                                          turnId: turnId
+        )
+        self.lastUserRequest = request
         self.skillSet = skillSet
         try await send(request)
     }
@@ -408,12 +438,23 @@ public final class ChatService: ChatServiceType, ObservableObject {
         deleteChatMessageFromStorage(id)
     }
 
-    // Not used for now
-    public func resendMessage(id: String) async throws {
-        if let message = (await memory.history).first(where: { $0.id == id })
+    public func resendMessage(id: String, model: String? = nil) async throws {
+        if let _ = (await memory.history).first(where: { $0.id == id }),
+           let lastUserRequest
         {
+            // TODO: clean up contents for resend message
+            activeRequestId = nil
             do {
-                try await send(id, content: message.content, skillSet: [], references: [])
+                try await send(
+                    id,
+                    content: lastUserRequest.content,
+                    skillSet: skillSet,
+                    references: lastUserRequest.references ?? [],
+                    model: model != nil ? model : lastUserRequest.model,
+                    agentMode: lastUserRequest.agentMode,
+                    userLanguage: lastUserRequest.userLanguage,
+                    turnId: id
+                )
             } catch {
                 print("Failed to resend message")
             }
@@ -611,17 +652,34 @@ public final class ChatService: ChatServiceType, ObservableObject {
             if CLSError.code == 402 {
                 Task {
                     await Status.shared
-                        .updateCLSStatus(.error, busy: false, message: CLSError.message)
+                        .updateCLSStatus(.warning, busy: false, message: CLSError.message)
                     let errorMessage = ChatMessage(
                         id: progress.turnId,
                         chatTabID: self.chatTabInfo.id,
                         clsTurnID: progress.turnId,
-                        role: .system,
-                        content: CLSError.message
+                        role: .assistant,
+                        content: "",
+                        panelMessages: [.init(type: .error, title: String(CLSError.code ?? 0), message: CLSError.message, location: .Panel)]
                     )
                     // will persist in resetongoingRequest()
-                    await memory.removeMessage(progress.turnId)
                     await memory.appendMessage(errorMessage)
+                    
+                    if let lastUserRequest {
+                        guard let fallbackModel = CopilotModelManager.getFallbackLLM(
+                            scope: lastUserRequest.agentMode ? .agentPanel : .chatPanel
+                        ) else {
+                            resetOngoingRequest()
+                            return
+                        }
+                        do {
+                            CopilotModelManager.switchToFallbackModel()
+                            try await resendMessage(id: progress.turnId, model: fallbackModel.id)
+                        } catch {
+                            Logger.gitHubCopilot.error(error)
+                            resetOngoingRequest()
+                        }
+                        return
+                    }
                 }
             } else if CLSError.code == 400 && CLSError.message.contains("model is not supported") {
                 Task {
@@ -633,6 +691,8 @@ public final class ChatService: ChatServiceType, ObservableObject {
                         errorMessage: "Oops, the model is not supported. Please enable it first in [GitHub Copilot settings](https://github.com/settings/copilot)."
                     )
                     await memory.appendMessage(errorMessage)
+                    resetOngoingRequest()
+                    return
                 }
             } else {
                 Task {
@@ -646,10 +706,10 @@ public final class ChatService: ChatServiceType, ObservableObject {
                     )
                     // will persist in resetOngoingRequest()
                     await memory.appendMessage(errorMessage)
+                    resetOngoingRequest()
+                    return
                 }
             }
-            resetOngoingRequest()
-            return
         }
         
         Task {
@@ -664,9 +724,8 @@ public final class ChatService: ChatServiceType, ObservableObject {
             )
             // will persist in resetOngoingRequest()
             await memory.appendMessage(message)
+            resetOngoingRequest()
         }
-        
-        resetOngoingRequest()
     }
     
     private func resetOngoingRequest() {
@@ -732,7 +791,12 @@ public final class ChatService: ChatServiceType, ObservableObject {
         
         do {
             if let conversationId = conversationId {
-                try await conversationProvider?.createTurn(with: conversationId, request: request, workspaceURL: getWorkspaceURL())
+                try await conversationProvider?
+                    .createTurn(
+                        with: conversationId,
+                        request: request,
+                        workspaceURL: getWorkspaceURL()
+                    )
             } else {
                 var requestWithTurns = request
                 

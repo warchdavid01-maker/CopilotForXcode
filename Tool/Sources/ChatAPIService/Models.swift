@@ -67,9 +67,9 @@ public struct ChatMessage: Equatable, Codable {
     public typealias ID = String
 
     public enum Role: String, Codable, Equatable {
-        case system
         case user
         case assistant
+        case system
     }
     
     /// The role of a message.
@@ -106,6 +106,8 @@ public struct ChatMessage: Equatable, Codable {
     
     public var editAgentRounds: [AgentRound]
     
+    public var panelMessages: [CopilotShowMessageParams]
+    
     /// The timestamp of the message.
     public var createdAt: Date
     public var updatedAt: Date
@@ -123,6 +125,7 @@ public struct ChatMessage: Equatable, Codable {
         rating: ConversationRating = .unrated,
         steps: [ConversationProgressStep] = [],
         editAgentRounds: [AgentRound] = [],
+        panelMessages: [CopilotShowMessageParams] = [],
         createdAt: Date? = nil,
         updatedAt: Date? = nil
     ) {
@@ -138,6 +141,7 @@ public struct ChatMessage: Equatable, Codable {
         self.rating = rating
         self.steps = steps
         self.editAgentRounds = editAgentRounds
+        self.panelMessages = panelMessages
 
         let now = Date.now
         self.createdAt = createdAt ?? now
