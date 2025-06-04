@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.36.0 - June 4, 2025
+### Added
+- Introduced a new chat setting "**Response Language**" under **Advanced** settings to customize the natural language used in chat replies.
+- Enabled support for custom instructions defined in _.github/copilot-instructions.md_ within your workspace.
+- Added support for premium request handling.
+
+### Fixed
+- Performance: Improved UI responsiveness by lazily restoring chat history.
+- Performance: Fixed lagging issue when pasting large text into the chat input.
+- Performance: Improved project indexing performance.
+- Don't trigger / (slash) commands when pasting a file path into the chat input.
+- Adjusted terminal text styling to align with Xcode’s theme.
+
 ## 0.35.0 - May 19, 2025
 ### Added
 - Launched Agent Mode. Copilot will automatically use multiple requests to edit files, run terminal commands, and fix errors.

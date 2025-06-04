@@ -444,7 +444,7 @@ public struct ChatPanelFeature {
                 let (originalTab, currentTab) = targetWorkspace.switchTab(to: &tab)
                 state.chatHistory.updateHistory(targetWorkspace)
                 
-                let currentChatWorkspace = chatWorkspace
+                let currentChatWorkspace = targetWorkspace
                 return .run { send in
                     await send(.saveChatTabInfo([originalTab, currentTab], currentChatWorkspace))
                     await send(.scheduleLRUCleanup(currentChatWorkspace))
