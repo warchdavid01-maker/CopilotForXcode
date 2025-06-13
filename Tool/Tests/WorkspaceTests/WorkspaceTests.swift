@@ -14,30 +14,32 @@ class WorkspaceFileTests: XCTestCase {
 
     func testIsXCWorkspace() throws {
         let tmpDir = try createTemporaryDirectory()
+        defer {
+            deleteDirectoryIfExists(at: tmpDir)
+        }
         do {
             let xcworkspaceURL = try createSubdirectory(in: tmpDir, withName: "myWorkspace.xcworkspace")
             XCTAssertFalse(WorkspaceFile.isXCWorkspace(xcworkspaceURL))
             let xcworkspaceDataURL = try createFile(in: xcworkspaceURL, withName: "contents.xcworkspacedata", contents: "")
             XCTAssertTrue(WorkspaceFile.isXCWorkspace(xcworkspaceURL))
         } catch {
-            deleteDirectoryIfExists(at: tmpDir)
             throw error
         }
-        deleteDirectoryIfExists(at: tmpDir)
     }
 
     func testIsXCProject() throws {
         let tmpDir = try createTemporaryDirectory()
+        defer {
+            deleteDirectoryIfExists(at: tmpDir)
+        }
         do {
             let xcprojectURL = try createSubdirectory(in: tmpDir, withName: "myProject.xcodeproj")
             XCTAssertFalse(WorkspaceFile.isXCProject(xcprojectURL))
             let xcprojectDataURL = try createFile(in: xcprojectURL, withName: "project.pbxproj", contents: "")
             XCTAssertTrue(WorkspaceFile.isXCProject(xcprojectURL))
         } catch {
-            deleteDirectoryIfExists(at: tmpDir)
             throw error
         }
-        deleteDirectoryIfExists(at: tmpDir)
     }
 
     func testGetFilesInActiveProject() throws {
@@ -62,6 +64,9 @@ class WorkspaceFileTests: XCTestCase {
 
     func testGetFilesInActiveWorkspace() throws {
         let tmpDir = try createTemporaryDirectory()
+        defer {
+            deleteDirectoryIfExists(at: tmpDir)
+        }
         do {
             let myWorkspaceRoot = try createSubdirectory(in: tmpDir, withName: "myWorkspace")
             let xcWorkspaceURL = try createSubdirectory(in: myWorkspaceRoot, withName: "myWorkspace.xcworkspace")
@@ -96,14 +101,15 @@ class WorkspaceFileTests: XCTestCase {
             XCTAssertTrue(fileNames.contains("file1.swift"))
             XCTAssertTrue(fileNames.contains("depFile1.swift"))
         } catch {
-            deleteDirectoryIfExists(at: tmpDir)
             throw error
         }
-        deleteDirectoryIfExists(at: tmpDir)
     }
 
     func testGetSubprojectURLsFromXCWorkspace() throws {
         let tmpDir = try createTemporaryDirectory()
+        defer {
+            deleteDirectoryIfExists(at: tmpDir)
+        }
         do {
             let xcworkspaceURL = try createSubdirectory(in: tmpDir, withName: "myWorkspace.xcworkspace")
             _ = try createFileFor_contents_dot_xcworkspacedata(directory: xcworkspaceURL, fileRefs: [
@@ -114,10 +120,8 @@ class WorkspaceFileTests: XCTestCase {
             XCTAssertEqual(subprojectURLs[0].path, tmpDir.path)
             XCTAssertEqual(subprojectURLs[1].path, tmpDir.appendingPathComponent("myDependency").path)
         } catch {
-            deleteDirectoryIfExists(at: tmpDir)
             throw error
         }
-        deleteDirectoryIfExists(at: tmpDir)
     }
 
     func testGetSubprojectURLs() {
@@ -210,5 +214,115 @@ class WorkspaceFileTests: XCTestCase {
         }
         contents += "</Workspace>"
         return contents
+    }
+    
+    func testIsValidFile() throws {
+        let tmpDir = try createTemporaryDirectory()
+        defer {
+            deleteDirectoryIfExists(at: tmpDir)
+        }
+        do {
+            // Test valid Swift file
+            let swiftFileURL = try createFile(in: tmpDir, withName: "ValidFile.swift", contents: "// Swift code")
+            XCTAssertTrue(try WorkspaceFile.isValidFile(swiftFileURL))
+            
+            // Test valid files with different supported extensions
+            let jsFileURL = try createFile(in: tmpDir, withName: "script.js", contents: "// JavaScript")
+            XCTAssertTrue(try WorkspaceFile.isValidFile(jsFileURL))
+            
+            let mdFileURL = try createFile(in: tmpDir, withName: "README.md", contents: "# Markdown")
+            XCTAssertTrue(try WorkspaceFile.isValidFile(mdFileURL))
+            
+            let jsonFileURL = try createFile(in: tmpDir, withName: "config.json", contents: "{}")
+            XCTAssertTrue(try WorkspaceFile.isValidFile(jsonFileURL))
+            
+            // Test case insensitive extension matching
+            let swiftUpperURL = try createFile(in: tmpDir, withName: "File.SWIFT", contents: "// Swift")
+            XCTAssertTrue(try WorkspaceFile.isValidFile(swiftUpperURL))
+            
+            // Test unsupported file extension
+            let unsupportedFileURL = try createFile(in: tmpDir, withName: "file.xyz", contents: "unsupported")
+            XCTAssertFalse(try WorkspaceFile.isValidFile(unsupportedFileURL))
+            
+            // Test files matching skip patterns
+            let gitFileURL = try createFile(in: tmpDir, withName: ".git", contents: "")
+            XCTAssertFalse(try WorkspaceFile.isValidFile(gitFileURL))
+            
+            let dsStoreURL = try createFile(in: tmpDir, withName: ".DS_Store", contents: "")
+            XCTAssertFalse(try WorkspaceFile.isValidFile(dsStoreURL))
+            
+            let nodeModulesURL = try createFile(in: tmpDir, withName: "node_modules", contents: "")
+            XCTAssertFalse(try WorkspaceFile.isValidFile(nodeModulesURL))
+            
+            // Test directory (should return false)
+            let subdirURL = try createSubdirectory(in: tmpDir, withName: "subdir")
+            XCTAssertFalse(try WorkspaceFile.isValidFile(subdirURL))
+            
+            // Test Xcode workspace (should return false)
+            let xcworkspaceURL = try createSubdirectory(in: tmpDir, withName: "test.xcworkspace")
+            _ = try createFile(in: xcworkspaceURL, withName: "contents.xcworkspacedata", contents: "")
+            XCTAssertFalse(try WorkspaceFile.isValidFile(xcworkspaceURL))
+            
+            // Test Xcode project (should return false)
+            let xcprojectURL = try createSubdirectory(in: tmpDir, withName: "test.xcodeproj")
+            _ = try createFile(in: xcprojectURL, withName: "project.pbxproj", contents: "")
+            XCTAssertFalse(try WorkspaceFile.isValidFile(xcprojectURL))
+            
+        } catch {
+            throw error
+        }
+    }
+    
+    func testIsValidFileWithCustomExclusionFilter() throws {
+        let tmpDir = try createTemporaryDirectory()
+        defer {
+            deleteDirectoryIfExists(at: tmpDir)
+        }
+        do {
+            let swiftFileURL = try createFile(in: tmpDir, withName: "TestFile.swift", contents: "// Swift code")
+            let jsFileURL = try createFile(in: tmpDir, withName: "script.js", contents: "// JavaScript")
+            
+            // Test without custom exclusion filter
+            XCTAssertTrue(try WorkspaceFile.isValidFile(swiftFileURL))
+            XCTAssertTrue(try WorkspaceFile.isValidFile(jsFileURL))
+            
+            // Test with custom exclusion filter that excludes Swift files
+            let excludeSwiftFilter: (URL) -> Bool = { url in
+                return url.pathExtension.lowercased() == "swift"
+            }
+            
+            XCTAssertFalse(try WorkspaceFile.isValidFile(swiftFileURL, shouldExcludeFile: excludeSwiftFilter))
+            XCTAssertTrue(try WorkspaceFile.isValidFile(jsFileURL, shouldExcludeFile: excludeSwiftFilter))
+            
+            // Test with custom exclusion filter that excludes files with "Test" in name
+            let excludeTestFilter: (URL) -> Bool = { url in
+                return url.lastPathComponent.contains("Test")
+            }
+            
+            XCTAssertFalse(try WorkspaceFile.isValidFile(swiftFileURL, shouldExcludeFile: excludeTestFilter))
+            XCTAssertTrue(try WorkspaceFile.isValidFile(jsFileURL, shouldExcludeFile: excludeTestFilter))
+            
+        } catch {
+            throw error
+        }
+    }
+    
+    func testIsValidFileWithAllSupportedExtensions() throws {
+        let tmpDir = try createTemporaryDirectory()
+        defer {
+            deleteDirectoryIfExists(at: tmpDir)
+        }
+        do {
+            let supportedExtensions = supportedFileExtensions
+            
+            for (index, ext) in supportedExtensions.enumerated() {
+                let fileName = "testfile\(index).\(ext)"
+                let fileURL = try createFile(in: tmpDir, withName: fileName, contents: "test content")
+                XCTAssertTrue(try WorkspaceFile.isValidFile(fileURL), "File with extension .\(ext) should be valid")
+            }
+            
+        } catch {
+            throw error
+        }
     }
 }

@@ -3,6 +3,7 @@ import XcodeInspector
 import Foundation
 import Logger
 import Workspace
+import SystemUtils
 
 public struct ContextUtils {
 
@@ -19,5 +20,15 @@ public struct ContextUtils {
         let files = WorkspaceFile.getFilesInActiveWorkspace(workspaceURL: workspaceURL, workspaceRootURL: workspaceRootURL)
         
         return files
+    }
+    
+    public static let workspaceReadabilityErrorMessageProvider: FileUtils.ReadabilityErrorMessageProvider = { status in
+        switch status {
+        case .readable: return nil
+        case .notFound: 
+            return "Copilot can't access this workspace. It may have been removed or is temporarily unavailable."
+        case .permissionDenied: 
+            return "Copilot can't access this workspace. Enable \"Files & Folders\" access in [System Settings](x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders)"
+        }
     }
 }

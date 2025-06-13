@@ -24,7 +24,7 @@ public struct DisplayedChatMessage: Equatable {
     public var references: [ConversationReference] = []
     public var followUp: ConversationFollowUp? = nil
     public var suggestedTitle: String? = nil
-    public var errorMessage: String? = nil
+    public var errorMessages: [String] = []
     public var steps: [ConversationProgressStep] = []
     public var editAgentRounds: [AgentRound] = []
     public var panelMessages: [CopilotShowMessageParams] = []
@@ -36,7 +36,7 @@ public struct DisplayedChatMessage: Equatable {
         references: [ConversationReference] = [],
         followUp: ConversationFollowUp? = nil,
         suggestedTitle: String? = nil,
-        errorMessage: String? = nil,
+        errorMessages: [String] = [],
         steps: [ConversationProgressStep] = [],
         editAgentRounds: [AgentRound] = [],
         panelMessages: [CopilotShowMessageParams] = []
@@ -47,7 +47,7 @@ public struct DisplayedChatMessage: Equatable {
         self.references = references
         self.followUp = followUp
         self.suggestedTitle = suggestedTitle
-        self.errorMessage = errorMessage
+        self.errorMessages = errorMessages
         self.steps = steps
         self.editAgentRounds = editAgentRounds
         self.panelMessages = panelMessages
@@ -371,7 +371,7 @@ struct Chat {
                         },
                         followUp: message.followUp,
                         suggestedTitle: message.suggestedTitle,
-                        errorMessage: message.errorMessage,
+                        errorMessages: message.errorMessages,
                         steps: message.steps,
                         editAgentRounds: message.editAgentRounds,
                         panelMessages: message.panelMessages

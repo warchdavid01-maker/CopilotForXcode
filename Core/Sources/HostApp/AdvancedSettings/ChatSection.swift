@@ -1,5 +1,8 @@
-import SwiftUI
+import Client
 import ComposableArchitecture
+import SwiftUI
+import Toast
+import XcodeInspector
 
 struct ChatSection: View {
     var body: some View {
@@ -7,8 +10,15 @@ struct ChatSection: View {
             VStack(spacing: 10) {
                 // Response language picker
                 ResponseLanguageSetting()
+                    .padding(.horizontal, 10)
+
+                Divider()
+
+                // Custom instructions
+                CustomInstructionSetting()
+                    .padding(.horizontal, 10)
             }
-            .padding(10)
+            .padding(.vertical, 10)
         }
     }
 }
@@ -68,6 +78,75 @@ struct ResponseLanguageSetting: View {
                     }
                 }
                 .frame(maxWidth: 200, alignment: .leading)
+            }
+        }
+    }
+}
+
+struct CustomInstructionSetting: View {
+    @State var isGlobalInstructionsViewOpen = false
+    @Environment(\.toast) var toast
+
+    var body: some View {
+        WithPerceptionTracking {
+            HStack {
+                VStack(alignment: .leading) {
+                    Text("Custom Instructions")
+                        .font(.body)
+                    Text("Configure custom instructions for GitHub Copilot to follow during chat sessions.")
+                        .font(.footnote)
+                }
+
+                Spacer()
+
+                Button("Current Workspace") {
+                    openCustomInstructions()
+                }
+
+                Button("Global") {
+                    isGlobalInstructionsViewOpen = true
+                }
+            }
+            .sheet(isPresented: $isGlobalInstructionsViewOpen) {
+                GlobalInstructionsView(isOpen: $isGlobalInstructionsViewOpen)
+            }
+        }
+    }
+
+    func openCustomInstructions() {
+        Task {
+            let service = try? getService()
+            let inspectorData = try? await service?.getXcodeInspectorData()
+            var currentWorkspace: URL? = nil
+            if let url = inspectorData?.realtimeActiveWorkspaceURL, let workspaceURL = URL(string: url), workspaceURL.path != "/" {
+                currentWorkspace = workspaceURL
+            } else if let url = inspectorData?.latestNonRootWorkspaceURL {
+                currentWorkspace = URL(string: url)
+            }
+
+            // Open custom instructions for the current workspace
+            if let workspaceURL = currentWorkspace, let projectURL = WorkspaceXcodeWindowInspector.extractProjectURL(workspaceURL: workspaceURL, documentURL: nil)  {
+
+                let configFile = projectURL.appendingPathComponent(".github/copilot-instructions.md")
+
+                // If the file doesn't exist, create one with a proper structure
+                if !FileManager.default.fileExists(atPath: configFile.path) {
+                    do {
+                        // Create directory if it doesn't exist
+                        try FileManager.default.createDirectory(
+                            at: projectURL.appendingPathComponent(".github"),
+                            withIntermediateDirectories: true
+                        )
+                        // Create empty file
+                        try "".write(to: configFile, atomically: true, encoding: .utf8)
+                    } catch {
+                        toast("Failed to create config file .github/copilot-instructions.md: \(error)", .error)
+                    }
+                }
+
+                if FileManager.default.fileExists(atPath: configFile.path) {
+                    NSWorkspace.shared.open(configFile)
+                }
             }
         }
     }

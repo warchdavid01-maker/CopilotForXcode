@@ -14,7 +14,7 @@ struct BotMessage: View {
     let text: String
     let references: [ConversationReference]
     let followUp: ConversationFollowUp?
-    let errorMessage: String?
+    let errorMessages: [String]
     let chat: StoreOf<Chat>
     let steps: [ConversationProgressStep]
     let editAgentRounds: [AgentRound]
@@ -154,10 +154,15 @@ struct BotMessage: View {
                     ThemedMarkdownText(text: text, chat: chat)
                 }
 
-                if errorMessage != nil {
-                    HStack(spacing: 4) {
-                        Image(systemName: "info.circle")
-                        ThemedMarkdownText(text: errorMessage!, chat: chat)
+                if !errorMessages.isEmpty {
+                    VStack(spacing: 4) {
+                        ForEach(errorMessages.indices, id: \.self) { index in 
+                            if let attributedString = try? AttributedString(markdown: errorMessages[index]) {
+                                NotificationBanner(style: .warning) {
+                                    Text(attributedString)
+                                }
+                            }
+                        }
                     }
                 }
                 
@@ -330,7 +335,7 @@ struct BotMessage_Previews: PreviewProvider {
                 kind: .class
             ), count: 2),
             followUp: ConversationFollowUp(message: "followup question", id: "id", type: "type"),
-            errorMessage: "Sorry, an error occurred while generating a response.",
+            errorMessages: ["Sorry, an error occurred while generating a response."],
             chat: .init(initialState: .init(), reducer: { Chat(service: ChatService.service(for: chatTabInfo)) }),
             steps: steps,
             editAgentRounds: agentRounds,

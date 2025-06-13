@@ -2,9 +2,11 @@ import ComposableArchitecture
 import ConversationServiceProvider
 import SharedUIComponents
 import SwiftUI
+import SystemUtils
 
 public struct FilePicker: View {
     @Binding var allFiles: [FileReference]
+    let workspaceURL: URL?
     var onSubmit: (_ file: FileReference) -> Void
     var onExit: () -> Void
     @FocusState private var isSearchBarFocused: Bool
@@ -19,6 +21,30 @@ public struct FilePicker: View {
 
         return allFiles.filter { doc in
             (doc.fileName ?? doc.url.lastPathComponent) .localizedCaseInsensitiveContains(searchText)
+        }
+    }
+    
+    private static let defaultEmptyStateText = "No results found."
+    
+    private var emptyStateAttributedString: AttributedString? {
+        var message = FilePicker.defaultEmptyStateText
+        if let workspaceURL = workspaceURL {
+            let status = FileUtils.checkFileReadability(at: workspaceURL.path)
+            if let errorMessage = status.errorMessage(using: ContextUtils.workspaceReadabilityErrorMessageProvider) {
+                message = errorMessage
+            }
+        }
+        
+        return try? AttributedString(markdown: message)
+    }
+    
+    private var emptyStateView: some View {
+        Group {
+            if let attributedString = emptyStateAttributedString {
+                Text(attributedString)
+            } else {
+                Text(FilePicker.defaultEmptyStateText)
+            }
         }
     }
 
@@ -75,7 +101,7 @@ public struct FilePicker: View {
                             }
                             
                             if filteredFiles.isEmpty {
-                                Text("No results found")
+                                emptyStateView
                                     .foregroundColor(.secondary)
                                     .padding(.leading, 4)
                                     .padding(.vertical, 4)

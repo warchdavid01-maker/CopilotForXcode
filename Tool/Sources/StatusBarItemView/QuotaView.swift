@@ -32,6 +32,14 @@ public class QuotaView: NSView {
         return copilotPlan == "business" || copilotPlan == "enterprise"
     }
     
+    private var isFreeQuotaUsedUp: Bool {
+        return chat.percentRemaining == 0 && completions.percentRemaining == 0
+    }
+    
+    private var isFreeQuotaRemaining: Bool {
+        return chat.percentRemaining > 25 && completions.percentRemaining > 25
+    }
+    
     // MARK: - Initialization
     public init(
         chat: QuotaSnapshot,
@@ -78,7 +86,7 @@ public class QuotaView: NSView {
             progressViews: createProgressViews(),
             statusMessageLabel: createStatusMessageLabel(),
             resetTextLabel: createResetTextLabel(),
-            linkLabel: createLinkLabel()
+            upsellLabel: createUpsellLabel()
         )
     }
     
@@ -89,8 +97,8 @@ public class QuotaView: NSView {
             addSubview(components.statusMessageLabel)
         }
         addSubview(components.resetTextLabel)
-        if !isOrgUser {
-            addSubview(components.linkLabel)
+        if !(isOrgUser || (isFreeUser && isFreeQuotaRemaining)) {
+            addSubview(components.upsellLabel)
         }
     }
 }
@@ -323,8 +331,8 @@ extension QuotaView {
 // MARK: - Footer Section
 extension QuotaView {
     private func createStatusMessageLabel() -> NSTextField {
-        let message = premiumInteractions.overagePermitted ? 
-            "Additional paid premium requests enabled." : 
+        let message = premiumInteractions.overagePermitted ?
+            "Additional paid premium requests enabled." :
             "Additional paid premium requests disabled."
         
         let label = NSTextField(labelWithString: isFreeUser ? "" : message)
@@ -358,18 +366,40 @@ extension QuotaView {
         return label
     }
     
-    private func createLinkLabel() -> HoverButton {
-        let button = HoverButton()
-        let title = isFreeUser ? "Upgrade to Copilot Pro" : "Manage paid premium requests"
-        
-        button.setLinkStyle(title: title, fontSize: Style.footerFontSize)
-        button.translatesAutoresizingMaskIntoConstraints = false
-        button.alphaValue = Style.labelAlphaValue
-        button.alignment = .left
-        button.target = self
-        button.action = #selector(openCopilotManageOverage)
-        
-        return button
+    private func createUpsellLabel() -> NSButton {
+        if isFreeUser {
+            let button = NSButton()
+            let upgradeTitle = "Upgrade to Copilot Pro"
+
+            button.translatesAutoresizingMaskIntoConstraints = false
+            button.bezelStyle = .push
+            if isFreeQuotaUsedUp {
+                button.attributedTitle = NSAttributedString(
+                    string: upgradeTitle,
+                    attributes: [.foregroundColor: NSColor.white]
+                )
+                button.bezelColor = .controlAccentColor
+            } else {
+                button.title = upgradeTitle
+            }
+            button.controlSize = .large
+            button.target = self
+            button.action = #selector(openCopilotUpgradePlan)
+
+            return button
+        } else {
+            let button = HoverButton()
+            let title = "Manage paid premium requests"
+            
+            button.setLinkStyle(title: title, fontSize: Style.footerFontSize)
+            button.translatesAutoresizingMaskIntoConstraints = false
+            button.alphaValue = Style.labelAlphaValue
+            button.alignment = .left
+            button.target = self
+            button.action = #selector(openCopilotManageOverage)
+            
+            return button
+        }
     }
 }
 
@@ -492,7 +522,7 @@ extension QuotaView {
             ])
         }
         
-        if isOrgUser {
+        if isOrgUser || (isFreeUser && isFreeQuotaRemaining) {
             // Do not show link label for business or enterprise users
             constraints.append(components.resetTextLabel.bottomAnchor.constraint(equalTo: bottomAnchor))
             return constraints
@@ -500,12 +530,12 @@ extension QuotaView {
         
         // Add link label constraints
         constraints.append(contentsOf: [
-            components.linkLabel.topAnchor.constraint(equalTo: components.resetTextLabel.bottomAnchor),
-            components.linkLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Layout.horizontalMargin),
-            components.linkLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Layout.horizontalMargin),
-            components.linkLabel.heightAnchor.constraint(equalToConstant: Layout.linkLabelHeight),
+            components.upsellLabel.topAnchor.constraint(equalTo: components.resetTextLabel.bottomAnchor),
+            components.upsellLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Layout.horizontalMargin),
+            components.upsellLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Layout.horizontalMargin),
+            components.upsellLabel.heightAnchor.constraint(equalToConstant: isFreeUser ? Layout.upgradeButtonHeight : Layout.linkLabelHeight),
             
-            components.linkLabel.bottomAnchor.constraint(equalTo: bottomAnchor)
+            components.upsellLabel.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
         
         return constraints
@@ -529,6 +559,14 @@ extension QuotaView {
             }
         }
     }
+    
+    @objc private func openCopilotUpgradePlan() {
+        Task {
+            if let url = URL(string: "https://aka.ms/github-copilot-upgrade-plan") {
+                NSWorkspace.shared.open(url)
+            }
+        }
+    }
 }
 
 // MARK: - Helper Types
@@ -537,7 +575,7 @@ private struct ViewComponents {
     let progressViews: [NSView]
     let statusMessageLabel: NSTextField
     let resetTextLabel: NSTextField
-    let linkLabel: NSButton
+    let upsellLabel: NSButton
 }
 
 // MARK: - Layout Constants
@@ -553,6 +591,7 @@ private struct Layout {
     static let unlimitedProgressBarHeight: CGFloat = 16
     static let footerTextHeight: CGFloat = 16
     static let linkLabelHeight: CGFloat = 16
+    static let upgradeButtonHeight: CGFloat = 40
     
     static let settingsButtonSize: CGFloat = 20
     static let settingsButtonHoverSize: CGFloat = 14

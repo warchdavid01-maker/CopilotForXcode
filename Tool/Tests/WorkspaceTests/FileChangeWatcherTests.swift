@@ -1,9 +1,9 @@
-import XCTest
-import Foundation
-import CoreServices
-import LanguageServerProtocol
 import ConversationServiceProvider
+import CoreServices
+import Foundation
+import LanguageServerProtocol
 @testable import Workspace
+import XCTest
 
 // MARK: - Mocks for Testing
 
@@ -55,13 +55,12 @@ class MockFSEventProvider: FSEventProvider {
 }
 
 class MockWorkspaceFileProvider: WorkspaceFileProvider {
-    
     var subprojects: [URL] = []
     var filesInWorkspace: [FileReference] = []
     var xcProjectPaths: Set<String> = []
     var xcWorkspacePaths: Set<String> = []
     
-    func getSubprojectURLs(in workspace: URL) -> [URL] {
+    func getProjects(by workspaceURL: URL) -> [URL] {
         return subprojects
     }
     

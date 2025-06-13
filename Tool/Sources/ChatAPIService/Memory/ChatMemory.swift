@@ -49,9 +49,7 @@ extension ChatMessage {
         self.suggestedTitle = message.suggestedTitle ?? self.suggestedTitle
         
         // merge error message
-        if let errorMessage = message.errorMessage {
-            self.errorMessage = (self.errorMessage ?? "") + errorMessage
-        }
+        self.errorMessages = self.errorMessages + message.errorMessages
         
         self.panelMessages = self.panelMessages + message.panelMessages
         

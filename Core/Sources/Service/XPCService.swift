@@ -7,6 +7,7 @@ import Preferences
 import Status
 import XPCShared
 import HostAppActivator
+import XcodeInspector
 
 public class XPCService: NSObject, XPCServiceProtocol {
     // MARK: - Service
@@ -238,6 +239,28 @@ public class XPCService: NSObject, XPCServiceProtocol {
             requestBody: requestBody,
             reply: reply
         )
+    }
+
+    // MARK: - XcodeInspector
+
+    public func getXcodeInspectorData(withReply reply: @escaping (Data?, Error?) -> Void) {
+        do {
+            // Capture current XcodeInspector data
+            let inspectorData = XcodeInspectorData(
+                activeWorkspaceURL: XcodeInspector.shared.activeWorkspaceURL?.absoluteString,
+                activeProjectRootURL: XcodeInspector.shared.activeProjectRootURL?.absoluteString,
+                realtimeActiveWorkspaceURL: XcodeInspector.shared.realtimeActiveWorkspaceURL?.absoluteString,
+                realtimeActiveProjectURL: XcodeInspector.shared.realtimeActiveProjectURL?.absoluteString,
+                latestNonRootWorkspaceURL: XcodeInspector.shared.latestNonRootWorkspaceURL?.absoluteString
+            )
+            
+            // Encode and send the data
+            let data = try JSONEncoder().encode(inspectorData)
+            reply(data, nil)
+        } catch {
+            Logger.service.error("Failed to encode XcodeInspector data: \(error.localizedDescription)")
+            reply(nil, error)
+        }
     }
 }
 

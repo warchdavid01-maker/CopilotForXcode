@@ -13,6 +13,7 @@ import ChatTab
 import Workspace
 import HostAppActivator
 import Persist
+import UniformTypeIdentifiers
 
 private let r: Double = 8
 
@@ -58,7 +59,39 @@ public struct ChatPanel: View {
             .onAppear {
                 chat.send(.appear)
             }
+            .onDrop(of: [.fileURL], isTargeted: nil) { providers in
+                onFileDrop(providers)
+            }
         }
+    }
+    
+    private func onFileDrop(_ providers: [NSItemProvider]) -> Bool {
+        for provider in providers {
+            if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+                provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier) { item, error in
+                    let url: URL? = {
+                        if let data = item as? Data {
+                            return URL(dataRepresentation: data, relativeTo: nil)
+                        } else if let url = item as? URL {
+                            return url
+                        }
+                        return nil
+                    }()
+                    
+                    guard let url, 
+                          let isValidFile = try? WorkspaceFile.isValidFile(url), 
+                          isValidFile 
+                    else { return }
+                    
+                    DispatchQueue.main.async {
+                        let fileReference = FileReference(url: url, isCurrentEditor: false)
+                        chat.send(.addSelectedFile(fileReference))
+                    }
+                }
+            }
+        }
+        
+        return true
     }
 }
 
@@ -339,7 +372,7 @@ struct ChatHistoryItem: View {
                     text: text,
                     references: message.references,
                     followUp: message.followUp,
-                    errorMessage: message.errorMessage,
+                    errorMessages: message.errorMessages,
                     chat: chat,
                     steps: message.steps,
                     editAgentRounds: message.editAgentRounds,
@@ -476,6 +509,7 @@ struct ChatPanelInputArea: View {
                     if isFilePickerPresented {
                         FilePicker(
                             allFiles: $allFiles,
+                            workspaceURL: chat.workspaceURL,
                             onSubmit: { file in
                                 chat.send(.addSelectedFile(file))
                             },

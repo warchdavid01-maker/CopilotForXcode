@@ -322,5 +322,29 @@ extension XPCExtensionService {
             }
         }
     }
-}
 
+    @XPCServiceActor
+    public func getXcodeInspectorData() async throws -> XcodeInspectorData {
+        return try await withXPCServiceConnected {
+            service, continuation in
+            service.getXcodeInspectorData { data, error in
+                if let error {
+                    continuation.reject(error)
+                    return
+                }
+                
+                guard let data else {
+                    continuation.reject(NoDataError())
+                    return
+                }
+                
+                do {
+                    let inspectorData = try JSONDecoder().decode(XcodeInspectorData.self, from: data)
+                    continuation.resume(inspectorData)
+                } catch {
+                    continuation.reject(error)
+                }
+            }
+        }
+    }
+}

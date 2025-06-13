@@ -169,6 +169,12 @@ struct LLMModel: Codable, Hashable {
     let billing: CopilotModelBilling?
 }
 
+struct ScopeCache {
+    var modelMultiplierCache: [String: String] = [:]
+    var cachedMaxWidth: CGFloat = 0
+    var lastModelsHash: Int = 0
+}
+
 struct ModelPicker: View {
     @State private var selectedModel = ""
     @State private var isHovered = false
@@ -178,6 +184,21 @@ struct ModelPicker: View {
 
     @State private var chatMode = "Ask"
     @State private var isAgentPickerHovered = false
+    
+    // Separate caches for both scopes
+    @State private var askScopeCache: ScopeCache = ScopeCache()
+    @State private var agentScopeCache: ScopeCache = ScopeCache()
+
+    let minimumPadding: Int = 48
+    let attributes: [NSAttributedString.Key: NSFont] = [.font: NSFont.systemFont(ofSize: NSFont.systemFontSize)]
+
+    var spaceWidth: CGFloat {
+        "\u{200A}".size(withAttributes: attributes).width
+    }
+
+    var minimumPaddingWidth: CGFloat {
+        spaceWidth * CGFloat(minimumPadding)
+    }
 
     init() {
         let initialModel = AppState.shared.getSelectedModelName() ?? CopilotModelManager.getDefaultChatModel()?.modelName ?? ""
@@ -191,6 +212,67 @@ struct ModelPicker: View {
 
     var defaultModel: LLMModel? {
         AppState.shared.isAgentModeEnabled() ? modelManager.defaultAgentModel : modelManager.defaultChatModel
+    }
+
+    // Get the current cache based on scope
+    var currentCache: ScopeCache {
+        AppState.shared.isAgentModeEnabled() ? agentScopeCache : askScopeCache
+    }
+
+    // Helper method to format multiplier text
+    func formatMultiplierText(for billing: CopilotModelBilling?) -> String {
+        guard let billingInfo = billing else { return "" }
+        
+        let multiplier = billingInfo.multiplier
+        if multiplier == 0 {
+            return "Included"
+        } else {
+            let numberPart = multiplier.truncatingRemainder(dividingBy: 1) == 0
+                ? String(format: "%.0f", multiplier)
+                : String(format: "%.2f", multiplier)
+            return "\(numberPart)x"
+        }
+    }
+    
+    // Update cache for specific scope only if models changed
+    func updateModelCacheIfNeeded(for scope: PromptTemplateScope) {
+        let currentModels = scope == .agentPanel ? modelManager.availableAgentModels : modelManager.availableChatModels
+        let modelsHash = currentModels.hashValue
+        
+        if scope == .agentPanel {
+            guard agentScopeCache.lastModelsHash != modelsHash else { return }
+            agentScopeCache = buildCache(for: currentModels, currentHash: modelsHash)
+        } else {
+            guard askScopeCache.lastModelsHash != modelsHash else { return }
+            askScopeCache = buildCache(for: currentModels, currentHash: modelsHash)
+        }
+    }
+    
+    // Build cache for given models
+    private func buildCache(for models: [LLMModel], currentHash: Int) -> ScopeCache {
+        var newCache: [String: String] = [:]
+        var maxWidth: CGFloat = 0
+
+        for model in models {
+            let multiplierText = formatMultiplierText(for: model.billing)
+            newCache[model.modelName] = multiplierText
+            
+            let displayName = "✓ \(model.modelName)"
+            let displayNameWidth = displayName.size(withAttributes: attributes).width
+            let multiplierWidth = multiplierText.isEmpty ? 0 : multiplierText.size(withAttributes: attributes).width
+            let totalWidth = displayNameWidth + minimumPaddingWidth + multiplierWidth
+            maxWidth = max(maxWidth, totalWidth)
+        }
+
+        if maxWidth == 0 {
+            maxWidth = selectedModel.size(withAttributes: attributes).width
+        }
+        
+        return ScopeCache(
+            modelMultiplierCache: newCache,
+            cachedMaxWidth: maxWidth,
+            lastModelsHash: currentHash
+        )
     }
 
     func updateCurrentModel() {
@@ -215,8 +297,8 @@ struct ModelPicker: View {
             }
         }
         
-        // Force refresh models
         self.updateCurrentModel()
+        updateModelCacheIfNeeded(for: scope)
     }
     
     // Model picker menu component
@@ -231,6 +313,10 @@ struct ModelPicker: View {
             
             // Display premium models section if available
             modelSection(title: "Premium Models", models: premiumModels)
+            
+            if standardModels.isEmpty {
+                Link("Add Premium Models", destination: URL(string: "https://aka.ms/github-copilot-upgrade-plan")!)
+            }
         }
         .menuStyle(BorderlessButtonMenuStyle())
         .frame(maxWidth: labelWidth())
@@ -264,7 +350,7 @@ struct ModelPicker: View {
             Text(createModelMenuItemAttributedString(
                 modelName: model.modelName,
                 isSelected: selectedModel == model.modelName,
-                billing: model.billing
+                cachedMultiplierText: currentCache.modelMultiplierCache[model.modelName] ?? ""
             ))
         }
     }
@@ -290,6 +376,9 @@ struct ModelPicker: View {
             }
             .onAppear() {
                 updateCurrentModel()
+                // Initialize both caches
+                updateModelCacheIfNeeded(for: .chatPanel)
+                updateModelCacheIfNeeded(for: .agentPanel)
                 Task {
                     await refreshModels()
                 }
@@ -297,8 +386,13 @@ struct ModelPicker: View {
             .onChange(of: defaultModel) { _ in
                 updateCurrentModel()
             }
-            .onChange(of: models) { _ in
+            .onChange(of: modelManager.availableChatModels) { _ in
                 updateCurrentModel()
+                updateModelCacheIfNeeded(for: .chatPanel)
+            }
+            .onChange(of: modelManager.availableAgentModels) { _ in
+                updateCurrentModel()
+                updateModelCacheIfNeeded(for: .agentPanel)
             }
             .onChange(of: chatMode) { _ in
                 updateCurrentModel()
@@ -310,8 +404,6 @@ struct ModelPicker: View {
     }
 
     func labelWidth() -> CGFloat {
-        let font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
-        let attributes = [NSAttributedString.Key.font: font]
         let width = selectedModel.size(withAttributes: attributes).width
         return CGFloat(width + 20)
     }
@@ -330,45 +422,29 @@ struct ModelPicker: View {
         }
     }
 
-    private func createModelMenuItemAttributedString(modelName: String, isSelected: Bool, billing: CopilotModelBilling?) -> AttributedString {
+    private func createModelMenuItemAttributedString(
+        modelName: String,
+        isSelected: Bool,
+        cachedMultiplierText: String
+    ) -> AttributedString {
         let displayName = isSelected ? "✓ \(modelName)" : "    \(modelName)"
-        let font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
-        let attributes: [NSAttributedString.Key: Any] = [.font: font]
-        let spaceWidth = "\u{200A}".size(withAttributes: attributes).width
-
-        let targetXPositionForMultiplier: CGFloat = 230
 
         var fullString = displayName
         var attributedString = AttributedString(fullString)
 
-        if let billingInfo = billing {
-            let multiplier = billingInfo.multiplier
-            
-            let effectiveMultiplierText: String
-            if multiplier == 0 {
-                effectiveMultiplierText = "Included"
-            } else {
-                let numberPart = multiplier.truncatingRemainder(dividingBy: 1) == 0
-                    ? String(format: "%.0f", multiplier)
-                    : String(format: "%.2f", multiplier)
-                effectiveMultiplierText = "\(numberPart)x"
-            }
-
+        if !cachedMultiplierText.isEmpty {
             let displayNameWidth = displayName.size(withAttributes: attributes).width
-            let multiplierTextWidth = effectiveMultiplierText.size(withAttributes: attributes).width
-            let neededPaddingWidth = targetXPositionForMultiplier - displayNameWidth - multiplierTextWidth
+            let multiplierTextWidth = cachedMultiplierText.size(withAttributes: attributes).width
+            let neededPaddingWidth = currentCache.cachedMaxWidth - displayNameWidth - multiplierTextWidth
+            let finalPaddingWidth = max(neededPaddingWidth, minimumPaddingWidth)
             
-            if neededPaddingWidth > 0 {
-                let numberOfSpaces = Int(round(neededPaddingWidth / spaceWidth))
-                let padding = String(repeating: "\u{200A}", count: max(0, numberOfSpaces))
-                fullString = "\(displayName)\(padding)\(effectiveMultiplierText)"
-            } else {
-                fullString = "\(displayName) \(effectiveMultiplierText)"
-            }
+            let numberOfSpaces = Int(round(finalPaddingWidth / spaceWidth))
+            let padding = String(repeating: "\u{200A}", count: max(minimumPadding, numberOfSpaces))
+            fullString = "\(displayName)\(padding)\(cachedMultiplierText)"
             
             attributedString = AttributedString(fullString)
 
-            if let range = attributedString.range(of: effectiveMultiplierText) {
+            if let range = attributedString.range(of: cachedMultiplierText) {
                 attributedString[range].foregroundColor = .secondary
             }
         }

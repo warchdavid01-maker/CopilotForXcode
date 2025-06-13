@@ -309,7 +309,7 @@ public class FileChangeWatcherService {
                 guard let self, let watcher = self.watcher else { return }
                 
                 let watchingProjects = Set(watcher.paths)
-                let projects = Set(self.workspaceFileProvider.getSubprojectURLs(in: self.workspaceURL))
+                let projects = Set(self.workspaceFileProvider.getProjects(by: self.workspaceURL))
                 
                 /// find added projects
                 let addedProjects = projects.subtracting(watchingProjects)
@@ -326,8 +326,9 @@ public class FileChangeWatcherService {
         guard workspaceURL.path != "/" else { return }
         
         guard watcher == nil else { return }
-        
-        let projects = workspaceFileProvider.getSubprojectURLs(in: workspaceURL)
+
+        let projects = workspaceFileProvider.getProjects(by: workspaceURL)
+        guard projects.count > 0 else { return }
         
         watcher = watcherFactory(projects, publisher)
         Logger.client.info("Started watching for file changes in \(projects)")

@@ -14,6 +14,7 @@ import Logger
 import Workspace
 import XcodeInspector
 import OrderedCollections
+import SystemUtils
 
 public protocol ChatServiceType {
     var memory: ContextAwareAutoManagedChatMemory { get set }
@@ -330,7 +331,7 @@ public final class ChatService: ChatServiceType, ObservableObject {
         let workDoneToken = UUID().uuidString
         activeRequestId = workDoneToken
         
-        let chatMessage = ChatMessage(
+        var chatMessage = ChatMessage(
             id: id,
             chatTabID: self.chatTabInfo.id,
             role: .user,
@@ -338,14 +339,34 @@ public final class ChatService: ChatServiceType, ObservableObject {
             references: references.toConversationReferences()
         )
         
+        let currentEditorSkill = skillSet.first(where: { $0.id == CurrentEditorSkill.ID }) as? CurrentEditorSkill
+        let currentFileReadability = currentEditorSkill == nil
+            ? nil
+            : FileUtils.checkFileReadability(at: currentEditorSkill!.currentFilePath)
+        var errorMessage: ChatMessage?
+        
+        var currentTurnId: String? = turnId
         // If turnId is provided, it is used to update the existing message, no need to append the user message
         if turnId == nil {
+            if let currentFileReadability, !currentFileReadability.isReadable {
+                // For associating error message with user message
+                currentTurnId = UUID().uuidString
+                chatMessage.clsTurnID = currentTurnId
+                errorMessage = buildErrorMessage(
+                    turnId: currentTurnId!,
+                    errorMessages: [
+                        currentFileReadability.errorMessage(
+                            using: CurrentEditorSkill.readabilityErrorMessageProvider
+                        )
+                    ].compactMap { $0 }.filter { !$0.isEmpty }
+                )
+            }
             await memory.appendMessage(chatMessage)
         }
         
         // reset file edits
         self.resetFileEdits()
-            
+        
         // persist
         saveChatMessageToStorage(chatMessage)
         
@@ -370,32 +391,68 @@ public final class ChatService: ChatServiceType, ObservableObject {
             return
         }
         
-        let skillCapabilities: [String] = [ CurrentEditorSkill.ID, ProblemsInActiveDocumentSkill.ID ]
+        if let errorMessage {
+            Task { await memory.appendMessage(errorMessage) }
+        }
+        
+        var activeDoc: Doc?
+        var validSkillSet: [ConversationSkill] = skillSet
+        if let currentEditorSkill, currentFileReadability?.isReadable == true {
+            activeDoc = Doc(uri: currentEditorSkill.currentFile.url.absoluteString)
+        } else {
+            validSkillSet.removeAll(where: { $0.id == CurrentEditorSkill.ID || $0.id == ProblemsInActiveDocumentSkill.ID })
+        }
+        
+        let request = createConversationRequest(
+            workDoneToken: workDoneToken,
+            content: content,
+            activeDoc: activeDoc,
+            references: references,
+            model: model,
+            agentMode: agentMode,
+            userLanguage: userLanguage,
+            turnId: currentTurnId,
+            skillSet: validSkillSet
+        )
+        
+        self.lastUserRequest = request
+        self.skillSet = validSkillSet
+        try await send(request)
+    }
+    
+    private func createConversationRequest(
+        workDoneToken: String, 
+        content: String,
+        activeDoc: Doc?,
+        references: [FileReference],
+        model: String? = nil,
+        agentMode: Bool = false,
+        userLanguage: String? = nil,
+        turnId: String? = nil,
+        skillSet: [ConversationSkill]
+    ) -> ConversationRequest {
+        let skillCapabilities: [String] = [CurrentEditorSkill.ID, ProblemsInActiveDocumentSkill.ID]
         let supportedSkills: [String] = skillSet.map { $0.id }
         let ignoredSkills: [String] = skillCapabilities.filter {
             !supportedSkills.contains($0)
         }
-        let currentEditorSkill = skillSet.first { $0.id == CurrentEditorSkill.ID }
-        let activeDoc: Doc? = (currentEditorSkill as? CurrentEditorSkill).map { Doc(uri: $0.currentFile.url.absoluteString) }
         
         /// replace the `@workspace` to `@project`
         let newContent = replaceFirstWord(in: content, from: "@workspace", to: "@project")
         
-        let request = ConversationRequest(workDoneToken: workDoneToken,
-                                          content: newContent,
-                                          workspaceFolder: "",
-                                          activeDoc: activeDoc,
-                                          skills: skillCapabilities,
-                                          ignoredSkills: ignoredSkills,
-                                          references: references,
-                                          model: model,
-                                          agentMode: agentMode,
-                                          userLanguage: userLanguage,
-                                          turnId: turnId
+        return ConversationRequest(
+            workDoneToken: workDoneToken,
+            content: newContent,
+            workspaceFolder: "",
+            activeDoc: activeDoc,
+            skills: skillCapabilities,
+            ignoredSkills: ignoredSkills,
+            references: references,
+            model: model,
+            agentMode: agentMode,
+            userLanguage: userLanguage,
+            turnId: turnId
         )
-        self.lastUserRequest = request
-        self.skillSet = skillSet
-        try await send(request)
     }
 
     public func sendAndWait(_ id: String, content: String) async throws -> String {
@@ -444,20 +501,16 @@ public final class ChatService: ChatServiceType, ObservableObject {
         {
             // TODO: clean up contents for resend message
             activeRequestId = nil
-            do {
-                try await send(
-                    id,
-                    content: lastUserRequest.content,
-                    skillSet: skillSet,
-                    references: lastUserRequest.references ?? [],
-                    model: model != nil ? model : lastUserRequest.model,
-                    agentMode: lastUserRequest.agentMode,
-                    userLanguage: lastUserRequest.userLanguage,
-                    turnId: id
-                )
-            } catch {
-                print("Failed to resend message")
-            }
+            try await send(
+                id,
+                content: lastUserRequest.content,
+                skillSet: skillSet,
+                references: lastUserRequest.references ?? [],
+                model: model != nil ? model : lastUserRequest.model,
+                agentMode: lastUserRequest.agentMode,
+                userLanguage: lastUserRequest.userLanguage,
+                turnId: id
+            )
         }
     }
 
@@ -569,6 +622,19 @@ public final class ChatService: ChatServiceType, ObservableObject {
         
         Task {
             if var lastUserMessage = await memory.history.last(where: { $0.role == .user }) {
+                
+                // Case: New conversation where error message was generated before CLS request
+                // Using clsTurnId to associate this error message with the corresponding user message
+                // When merging error messages with bot responses from CLS, these properties need to be updated
+                await memory.mutateHistory { history in 
+                    if let existingBotIndex = history.lastIndex(where: {
+                        $0.role == .assistant && $0.clsTurnID == lastUserMessage.clsTurnID
+                    }) {
+                        history[existingBotIndex].id = turnId
+                        history[existingBotIndex].clsTurnID = turnId
+                    }
+                }
+                
                 lastUserMessage.clsTurnID = progress.turnId
                 saveChatMessageToStorage(lastUserMessage)
             }
@@ -653,14 +719,9 @@ public final class ChatService: ChatServiceType, ObservableObject {
                 Task {
                     await Status.shared
                         .updateCLSStatus(.warning, busy: false, message: CLSError.message)
-                    let errorMessage = ChatMessage(
-                        id: progress.turnId,
-                        chatTabID: self.chatTabInfo.id,
-                        clsTurnID: progress.turnId,
-                        role: .assistant,
-                        content: "",
-                        panelMessages: [.init(type: .error, title: String(CLSError.code ?? 0), message: CLSError.message, location: .Panel)]
-                    )
+                    let errorMessage = buildErrorMessage(
+                        turnId: progress.turnId, 
+                        panelMessages: [.init(type: .error, title: String(CLSError.code ?? 0), message: CLSError.message, location: .Panel)])
                     // will persist in resetongoingRequest()
                     await memory.appendMessage(errorMessage)
                     
@@ -683,12 +744,9 @@ public final class ChatService: ChatServiceType, ObservableObject {
                 }
             } else if CLSError.code == 400 && CLSError.message.contains("model is not supported") {
                 Task {
-                    let errorMessage = ChatMessage(
-                        id: progress.turnId,
-                        chatTabID: self.chatTabInfo.id,
-                        role: .assistant,
-                        content: "",
-                        errorMessage: "Oops, the model is not supported. Please enable it first in [GitHub Copilot settings](https://github.com/settings/copilot)."
+                    let errorMessage = buildErrorMessage(
+                        turnId: progress.turnId, 
+                        errorMessages: ["Oops, the model is not supported. Please enable it first in [GitHub Copilot settings](https://github.com/settings/copilot)."]
                     )
                     await memory.appendMessage(errorMessage)
                     resetOngoingRequest()
@@ -696,14 +754,7 @@ public final class ChatService: ChatServiceType, ObservableObject {
                 }
             } else {
                 Task {
-                    let errorMessage = ChatMessage(
-                        id: progress.turnId,
-                        chatTabID: self.chatTabInfo.id,
-                        clsTurnID: progress.turnId,
-                        role: .assistant,
-                        content: "",
-                        errorMessage: CLSError.message
-                    )
+                    let errorMessage = buildErrorMessage(turnId: progress.turnId, errorMessages: [CLSError.message])
                     // will persist in resetOngoingRequest()
                     await memory.appendMessage(errorMessage)
                     resetOngoingRequest()
@@ -726,6 +777,22 @@ public final class ChatService: ChatServiceType, ObservableObject {
             await memory.appendMessage(message)
             resetOngoingRequest()
         }
+    }
+    
+    private func buildErrorMessage(
+        turnId: String, 
+        errorMessages: [String] = [], 
+        panelMessages: [CopilotShowMessageParams] = []
+    ) -> ChatMessage {
+        return .init(
+            id: turnId,
+            chatTabID: chatTabInfo.id,
+            clsTurnID: turnId,
+            role: .assistant,
+            content: "",
+            errorMessages: errorMessages,
+            panelMessages: panelMessages
+        )
     }
     
     private func resetOngoingRequest() {

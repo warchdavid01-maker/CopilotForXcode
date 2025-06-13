@@ -1,8 +1,9 @@
-import Foundation
 import ConversationServiceProvider
+import CopilotForXcodeKit
+import Foundation
 
 public protocol WorkspaceFileProvider {
-    func getSubprojectURLs(in workspaceURL: URL) -> [URL]
+    func getProjects(by workspaceURL: URL) -> [URL]
     func getFilesInActiveWorkspace(workspaceURL: URL, workspaceRootURL: URL) -> [FileReference]
     func isXCProject(_ url: URL) -> Bool
     func isXCWorkspace(_ url: URL) -> Bool
@@ -11,8 +12,10 @@ public protocol WorkspaceFileProvider {
 public class FileChangeWatcherWorkspaceFileProvider: WorkspaceFileProvider {
     public init() {}
     
-    public func getSubprojectURLs(in workspaceURL: URL) -> [URL] {
-        return WorkspaceFile.getSubprojectURLs(in: workspaceURL)
+    public func getProjects(by workspaceURL: URL) -> [URL] {
+        guard let workspaceInfo = WorkspaceFile.getWorkspaceInfo(workspaceURL: workspaceURL)
+        else { return [] }
+        return WorkspaceFile.getProjects(workspace: workspaceInfo).map { URL(fileURLWithPath: $0.uri) }
     }
     
     public func getFilesInActiveWorkspace(workspaceURL: URL, workspaceRootURL: URL) -> [FileReference] {

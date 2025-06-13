@@ -62,41 +62,25 @@ struct FunctionMessage: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 6) {
-                Image(systemName: "exclamationmark.triangle")
-                    .font(Font.system(size: 12))
-                    .foregroundColor(.orange)
-
-                VStack(alignment: .leading, spacing: 8) {
-                    errorContent
-                    
-                    if isFreePlanUser {
-                        Button("Update to Copilot Pro") {
-                            if let url = URL(string: "https://aka.ms/github-copilot-upgrade-plan") {
-                                openURL(url)
-                            }
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.regular)
-                        .onHover { isHovering in
-                            if isHovering {
-                                NSCursor.pointingHand.push()
-                            } else {
-                                NSCursor.pop()
-                            }
-                        }
+        NotificationBanner(style: .warning) {
+            errorContent
+            
+            if isFreePlanUser {
+                Button("Update to Copilot Pro") {
+                    if let url = URL(string: "https://aka.ms/github-copilot-upgrade-plan") {
+                        openURL(url)
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+                .onHover { isHovering in
+                    if isHovering {
+                        NSCursor.pointingHand.push()
+                    } else {
+                        NSCursor.pop()
                     }
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-            .padding(.vertical, 10)
-            .padding(.horizontal, 12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 6)
-                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
-            )
-            .padding(.vertical, 4)
         }
     }
 }

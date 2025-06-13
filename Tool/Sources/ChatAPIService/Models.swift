@@ -99,7 +99,7 @@ public struct ChatMessage: Equatable, Codable {
     public var suggestedTitle: String?
 
     /// The error occurred during responding chat in server
-    public var errorMessage: String?
+    public var errorMessages: [String]
     
     /// The steps of conversation progress
     public var steps: [ConversationProgressStep]
@@ -121,7 +121,7 @@ public struct ChatMessage: Equatable, Codable {
         references: [ConversationReference] = [],
         followUp: ConversationFollowUp? = nil,
         suggestedTitle: String? = nil,
-        errorMessage: String? = nil,
+        errorMessages: [String] = [],
         rating: ConversationRating = .unrated,
         steps: [ConversationProgressStep] = [],
         editAgentRounds: [AgentRound] = [],
@@ -137,7 +137,7 @@ public struct ChatMessage: Equatable, Codable {
         self.references = references
         self.followUp = followUp
         self.suggestedTitle = suggestedTitle
-        self.errorMessage = errorMessage
+        self.errorMessages = errorMessages
         self.rating = rating
         self.steps = steps
         self.editAgentRounds = editAgentRounds

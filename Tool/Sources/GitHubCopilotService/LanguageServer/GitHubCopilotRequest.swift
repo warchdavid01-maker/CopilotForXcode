@@ -87,14 +87,20 @@ public func editorConfiguration() -> JSONValue {
         let mcpConfig = UserDefaults.shared.value(for: \.gitHubCopilotMCPConfig)
         return JSONValue.string(mcpConfig)
     }
-    
+
+    var customInstructions: JSONValue? {
+        let instructions = UserDefaults.shared.value(for: \.globalCopilotInstructions)
+        return .string(instructions)
+    }
+
     var d: [String: JSONValue] = [:]
     if let http { d["http"] = http }
     if let authProvider { d["github-enterprise"] = authProvider }
-    if let mcp { 
+    if mcp != nil || customInstructions != nil {
         var github: [String: JSONValue] = [:]
         var copilot: [String: JSONValue] = [:]
         copilot["mcp"] = mcp
+        copilot["globalCopilotInstructions"] = customInstructions
         github["copilot"] = .hash(copilot)
         d["github"] = .hash(github)
     }

@@ -299,6 +299,10 @@ public extension UserDefaultPreferenceKeys {
     var chatResponseLocale: PreferenceKey<String> {
         .init(defaultValue: "en", key: "ChatResponseLocale")
     }
+
+    var globalCopilotInstructions: PreferenceKey<String> {
+        .init(defaultValue: "", key: "GlobalCopilotInstructions")
+    }
 }
 
 // MARK: - Theme

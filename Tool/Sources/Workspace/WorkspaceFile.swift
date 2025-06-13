@@ -21,6 +21,13 @@ public struct ProjectInfo {
     public let name: String
 }
 
+extension NSError {
+    var isPermissionDenied: Bool {
+        return (domain == NSCocoaErrorDomain && code == 257) ||
+               (domain == NSPOSIXErrorDomain && code == 1)
+    }
+}
+
 public struct WorkspaceFile {
     
     static func isXCWorkspace(_ url: URL) -> Bool {
@@ -83,8 +90,12 @@ public struct WorkspaceFile {
         do {
             let data = try Data(contentsOf: workspaceFile)
             return getSubprojectURLs(workspaceURL: workspaceURL, data: data)
-        } catch {
-            Logger.client.error("Failed to read workspace file at \(workspaceFile.path): \(error)")
+        } catch let error as NSError {
+            if error.isPermissionDenied {
+                Logger.client.info("Permission denied for accessing file at \(workspaceFile.path)")
+            } else {
+                Logger.client.error("Failed to read workspace file at \(workspaceFile.path): \(error)")
+            }
             return []
         }
     }
@@ -131,6 +142,35 @@ public struct WorkspaceFile {
         }
         return name
     }
+    
+    private static func shouldSkipFile(_ url: URL) -> Bool {
+        return matchesPatterns(url, patterns: skipPatterns) 
+            || isXCWorkspace(url) 
+            || isXCProject(url) 
+    }
+    
+    public static func isValidFile(
+        _ url: URL,
+        shouldExcludeFile: ((URL) -> Bool)? = nil
+    ) throws -> Bool {
+        if shouldSkipFile(url) { return false }
+        
+        let resourceValues = try url.resourceValues(forKeys: [.isRegularFileKey, .isDirectoryKey])
+        
+        // Handle directories if needed
+        if resourceValues.isDirectory == true { return false }
+        
+        guard resourceValues.isRegularFile == true else { return false }
+        if supportedFileExtensions.contains(url.pathExtension.lowercased()) == false {
+            return false
+        }
+        
+        // Apply the custom file exclusion check if provided
+        if let shouldExcludeFile = shouldExcludeFile,
+           shouldExcludeFile(url) { return false }
+
+        return true
+    }
 
     public static func getFilesInActiveWorkspace(
         workspaceURL: URL,
@@ -159,26 +199,12 @@ public struct WorkspaceFile {
 
                 while let fileURL = enumerator?.nextObject() as? URL {
                     // Skip items matching the specified pattern
-                    if matchesPatterns(fileURL, patterns: skipPatterns) || isXCWorkspace(fileURL) ||
-                        isXCProject(fileURL) {
+                    if shouldSkipFile(fileURL) {
                         enumerator?.skipDescendants()
                         continue
                     }
 
-                    let resourceValues = try fileURL.resourceValues(forKeys: [.isRegularFileKey, .isDirectoryKey])
-                    // Handle directories if needed
-                    if resourceValues.isDirectory == true {
-                        continue
-                    }
-
-                    guard resourceValues.isRegularFile == true else { continue }
-                    if supportedFileExtensions.contains(fileURL.pathExtension.lowercased()) == false {
-                        continue
-                    }
-                    
-                    // Apply the custom file exclusion check if provided
-                    if let shouldExcludeFile = shouldExcludeFile,
-                       shouldExcludeFile(fileURL) { continue }
+                    guard try isValidFile(fileURL, shouldExcludeFile: shouldExcludeFile) else { continue }
 
                     let relativePath = fileURL.path.replacingOccurrences(of: workspaceRootURL.path, with: "")
                     let fileName = fileURL.lastPathComponent
