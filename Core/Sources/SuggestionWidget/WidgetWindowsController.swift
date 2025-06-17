@@ -142,13 +142,14 @@ private extension WidgetWindowsController {
                     await updateWidgetsAndNotifyChangeOfEditor(immediately: false)
                 case .mainWindowChanged:
                     await updateWidgetsAndNotifyChangeOfEditor(immediately: false)
-                case .moved,
-                     .resized,
-                     .windowMoved,
-                     .windowResized,
-                     .windowMiniaturized,
-                     .windowDeminiaturized:
+                case .windowMiniaturized, .windowDeminiaturized:
                     await updateWidgets(immediately: false)
+                case .resized,
+                    .moved,
+                    .windowMoved,
+                    .windowResized:
+                    await updateWidgets(immediately: false)
+                    await updateChatWindowLocation()
                 case .created, .uiElementDestroyed, .xcodeCompletionPanelChanged,
                      .applicationDeactivated:
                     continue
@@ -339,8 +340,7 @@ extension WidgetWindowsController {
     
     // Generate a default location when no workspace is opened
     private func generateDefaultLocation() -> WidgetLocation {
-        let mainScreen = NSScreen.main ?? NSScreen.screens.first!
-        let chatPanelFrame = UpdateLocationStrategy.getChatPanelFrame(mainScreen)
+        let chatPanelFrame = UpdateLocationStrategy.getChatPanelFrame(isAttachedToXcodeEnabled: false)
         
         return WidgetLocation(
             widgetFrame: .zero,
@@ -444,6 +444,18 @@ extension WidgetWindowsController {
 
         updateWindowOpacityTask = task
     }
+    
+    @MainActor
+    func updateChatWindowLocation() {
+        let state = store.withState { $0 }
+        let isAttachedToXcodeEnabled = UserDefaults.shared.value(for: \.autoAttachChatToXcode)
+        if isAttachedToXcodeEnabled {
+            if state.chatPanelState.isPanelDisplayed && !windows.chatPanelWindow.isWindowHidden {
+                let frame = UpdateLocationStrategy.getChatPanelFrame(isAttachedToXcodeEnabled: isAttachedToXcodeEnabled)
+                windows.chatPanelWindow.setFrame(frame, display: true, animate: true)
+            }
+        }
+    }
 
     func updateWindowLocation(
         animated: Bool,
@@ -481,8 +493,11 @@ extension WidgetWindowsController {
                     animate: animated
                 )
             }
-
-            if isChatPanelDetached {
+            
+            let isAttachedToXcodeEnabled = UserDefaults.shared.value(for: \.autoAttachChatToXcode)
+            if isAttachedToXcodeEnabled {
+                // update in `updateChatWindowLocation`
+            } else if isChatPanelDetached {
                 // don't update it!
             } else {
                 windows.chatPanelWindow.setFrame(
@@ -523,10 +538,10 @@ extension WidgetWindowsController {
 
     @MainActor
     func adjustChatPanelWindowLevel() async {
+        let window = windows.chatPanelWindow
+        
         let disableFloatOnTopWhenTheChatPanelIsDetached = UserDefaults.shared
             .value(for: \.disableFloatOnTopWhenTheChatPanelIsDetached)
-
-        let window = windows.chatPanelWindow
         guard disableFloatOnTopWhenTheChatPanelIsDetached else {
             window.setFloatOnTop(true)
             return
@@ -549,7 +564,7 @@ extension WidgetWindowsController {
         } else {
             false
         }
-
+        
         if !floatOnTopWhenOverlapsXcode || !latestAppIsXcodeOrExtension {
             window.setFloatOnTop(false)
         } else {

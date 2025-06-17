@@ -29,7 +29,8 @@ extension NSError {
 }
 
 public struct WorkspaceFile {
-    
+    private static let wellKnownBundleExtensions: Set<String> = ["app", "xcarchive"]
+
     static func isXCWorkspace(_ url: URL) -> Bool {
         return url.pathExtension == "xcworkspace" && FileManager.default.fileExists(atPath: url.appendingPathComponent("contents.xcworkspacedata").path)
     }
@@ -38,53 +39,22 @@ public struct WorkspaceFile {
         return url.pathExtension == "xcodeproj" && FileManager.default.fileExists(atPath: url.appendingPathComponent("project.pbxproj").path)
     }
     
+    static func isKnownPackageFolder(_ url: URL) -> Bool {
+        guard wellKnownBundleExtensions.contains(url.pathExtension) else {
+            return false
+        }
+
+        let resourceValues = try? url.resourceValues(forKeys: [.isPackageKey])
+        return resourceValues?.isPackage == true
+    }
+
     static func getWorkspaceByProject(_ url: URL) -> URL? {
         guard isXCProject(url) else { return nil }
         let workspaceURL = url.appendingPathComponent("project.xcworkspace")
         
         return isXCWorkspace(workspaceURL) ? workspaceURL : nil
     }
-    
-    static func getSubprojectURLs(workspaceURL: URL, data: Data) -> [URL] {
-        var subprojectURLs: [URL] = []
-        do {
-            let xml = try XMLDocument(data: data)
-            let fileRefs = try xml.nodes(forXPath: "//FileRef")
-            for fileRef in fileRefs {
-                if let fileRefElement = fileRef as? XMLElement,
-                   let location = fileRefElement.attribute(forName: "location")?.stringValue {
-                    var path = ""
-                    if location.starts(with: "group:") {
-                        path = location.replacingOccurrences(of: "group:", with: "")
-                    } else if location.starts(with: "container:") {
-                        path = location.replacingOccurrences(of: "container:", with: "")
-                    } else if location.starts(with: "self:") {
-                        // Handle "self:" referece - refers to the containing project directory
-                        var workspaceURLCopy = workspaceURL
-                        workspaceURLCopy.deleteLastPathComponent()
-                        path = workspaceURLCopy.path
-                        
-                    } else {
-                        // Skip absolute paths such as absolute:/path/to/project
-                        continue
-                    }
 
-                    if path.hasSuffix(".xcodeproj") {
-                        path = (path as NSString).deletingLastPathComponent
-                    }
-                    let subprojectURL = path.isEmpty ? workspaceURL.deletingLastPathComponent() : workspaceURL.deletingLastPathComponent().appendingPathComponent(path)
-                    if !subprojectURLs.contains(subprojectURL) {
-                        subprojectURLs.append(subprojectURL)
-                    }
-                }
-            }
-        } catch {
-            Logger.client.error("Failed to parse workspace file: \(error)")
-        }
-
-        return subprojectURLs
-    }
-    
     static func getSubprojectURLs(in workspaceURL: URL) -> [URL] {
         let workspaceFile = workspaceURL.appendingPathComponent("contents.xcworkspacedata")
         do {
@@ -99,7 +69,84 @@ public struct WorkspaceFile {
             return []
         }
     }
-    
+
+    static func getSubprojectURLs(workspaceURL: URL, data: Data) -> [URL] {
+        do {
+            let xml = try XMLDocument(data: data)
+            let workspaceBaseURL = workspaceURL.deletingLastPathComponent()
+            // Process all FileRefs and Groups recursively
+            return processWorkspaceNodes(xml.rootElement()?.children ?? [], baseURL: workspaceBaseURL)
+        } catch {
+            Logger.client.error("Failed to parse workspace file: \(error)")
+        }
+
+        return []
+    }
+
+    /// Recursively processes all nodes in a workspace file, collecting project URLs
+    private static func processWorkspaceNodes(_ nodes: [XMLNode], baseURL: URL, currentGroupPath: String = "") -> [URL] {
+        var results: [URL] = []
+        
+        for node in nodes {
+            guard let element = node as? XMLElement else { continue }
+
+            let location = element.attribute(forName: "location")?.stringValue ?? ""
+            if element.name == "FileRef" {
+                if let url = resolveProjectLocation(location: location, baseURL: baseURL, groupPath: currentGroupPath),
+                   !results.contains(url) {
+                    results.append(url)
+                }
+            } else if element.name == "Group" {
+                var groupPath = currentGroupPath
+                if !location.isEmpty, let path = extractPathFromLocation(location) {
+                    groupPath = (groupPath as NSString).appendingPathComponent(path)
+                }
+
+                // Process all children of this group, passing the updated group path
+                let childResults = processWorkspaceNodes(element.children ?? [], baseURL: baseURL, currentGroupPath: groupPath)
+
+                for url in childResults {
+                    if !results.contains(url) {
+                        results.append(url)
+                    }
+                }
+            }
+        }
+
+        return results
+    }
+
+    /// Extracts path component from a location string
+    private static func extractPathFromLocation(_ location: String) -> String? {
+        for prefix in ["group:", "container:", "self:"] {
+            if location.starts(with: prefix) {
+                return location.replacingOccurrences(of: prefix, with: "")
+            }
+        }
+        return nil
+    }
+
+    static func resolveProjectLocation(location: String, baseURL: URL, groupPath: String = "") -> URL? {
+        var path = ""
+
+        // Extract the path from the location string
+        if let extractedPath = extractPathFromLocation(location) {
+            path = extractedPath
+        } else {
+            // Unknown location format
+            return nil
+        }
+
+        var url: URL = groupPath.isEmpty ? baseURL : baseURL.appendingPathComponent(groupPath)
+        url = path.isEmpty ? url : url.appendingPathComponent(path)
+        url = url.standardized // normalize “..” or “.” in the path
+        if isXCProject(url) { // return the containing directory of the .xcodeproj file
+            url.deleteLastPathComponent()
+        }
+
+        return url
+    }
+
     static func matchesPatterns(_ url: URL, patterns: [String]) -> Bool {
         let fileName = url.lastPathComponent
         for pattern in patterns {
@@ -144,9 +191,11 @@ public struct WorkspaceFile {
     }
     
     private static func shouldSkipFile(_ url: URL) -> Bool {
-        return matchesPatterns(url, patterns: skipPatterns) 
-            || isXCWorkspace(url) 
-            || isXCProject(url) 
+        return matchesPatterns(url, patterns: skipPatterns)
+        || isXCWorkspace(url)
+        || isXCProject(url)
+        || isKnownPackageFolder(url)
+        || url.pathExtension == "xcassets"
     }
     
     public static func isValidFile(

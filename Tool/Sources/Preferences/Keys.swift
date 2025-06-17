@@ -303,6 +303,10 @@ public extension UserDefaultPreferenceKeys {
     var globalCopilotInstructions: PreferenceKey<String> {
         .init(defaultValue: "", key: "GlobalCopilotInstructions")
     }
+    
+    var autoAttachChatToXcode: PreferenceKey<Bool> {
+        .init(defaultValue: true, key: "AutoAttachChatToXcode")
+    }
 }
 
 // MARK: - Theme

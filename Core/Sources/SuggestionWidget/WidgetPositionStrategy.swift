@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import XcodeInspector
 
 public struct WidgetLocation: Equatable {
     struct PanelLocation: Equatable {
@@ -319,14 +320,41 @@ enum UpdateLocationStrategy {
         return selectionFrame
     }
     
-    static func getChatPanelFrame(_ screen: NSScreen) -> CGRect {
+    static func getChatPanelFrame(isAttachedToXcodeEnabled: Bool = false) -> CGRect {
+        let screen = NSScreen.main ?? NSScreen.screens.first!
+        return getChatPanelFrame(screen, isAttachedToXcodeEnabled: isAttachedToXcodeEnabled)
+    }
+    
+    static func getChatPanelFrame(_ screen: NSScreen, isAttachedToXcodeEnabled: Bool = false) -> CGRect {
         let visibleScreenFrame = screen.visibleFrame
-        // avoid too wide
-        let width = min(Style.panelWidth, visibleScreenFrame.width * 0.3)
-        let height = visibleScreenFrame.height
-        let x = visibleScreenFrame.width - width
-                
-        return CGRect(x: x, y: visibleScreenFrame.height, width: width, height: height)
+        
+        // Default Frame
+        var width = min(Style.panelWidth, visibleScreenFrame.width * 0.3)
+        var height = visibleScreenFrame.height
+        var x = visibleScreenFrame.maxX - width
+        var y = visibleScreenFrame.minY
+        
+        if isAttachedToXcodeEnabled,
+           let latestActiveXcode = XcodeInspector.shared.latestActiveXcode,
+           let xcodeWindow = latestActiveXcode.appElement.focusedWindow,
+           let xcodeScreen = latestActiveXcode.appScreen,
+           let xcodeRect = xcodeWindow.rect,
+           let mainDisplayScreen = NSScreen.screens.first(where: { $0.frame.origin == .zero }) // The main display should exist
+        {
+            let minWidth = Style.minChatPanelWidth
+            let visibleXcodeScreenFrame = xcodeScreen.visibleFrame
+            
+            width = max(visibleXcodeScreenFrame.maxX - xcodeRect.maxX, minWidth)
+            height = xcodeRect.height
+            x = visibleXcodeScreenFrame.maxX - width
+            
+            // AXUIElement coordinates: Y=0 at top-left
+            // NSWindow coordinates: Y=0 at bottom-left
+            y = mainDisplayScreen.frame.maxY - xcodeRect.maxY + mainDisplayScreen.frame.minY
+        }
+        
+        
+        return CGRect(x: x, y: y, width: width, height: height)
     }
 }
 

@@ -76,6 +76,13 @@ final class ChatPanelWindow: NSWindow {
                 }
             }
         }
+        
+        setInitialFrame()
+    }
+    
+    private func setInitialFrame() {
+        let frame = UpdateLocationStrategy.getChatPanelFrame(isAttachedToXcodeEnabled: false)
+        setFrame(frame, display: false, animate: true)
     }
 
     func setFloatOnTop(_ isFloatOnTop: Bool) {

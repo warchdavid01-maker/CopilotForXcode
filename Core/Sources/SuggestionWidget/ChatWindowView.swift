@@ -141,6 +141,7 @@ struct ChatLoadingView: View {
 struct ChatTitleBar: View {
     let store: StoreOf<ChatPanelFeature>
     @State var isHovering = false
+    @AppStorage(\.autoAttachChatToXcode) var autoAttachChatToXcode
 
     var body: some View {
         WithPerceptionTracking {
@@ -167,18 +168,20 @@ struct ChatTitleBar: View {
 
                 Spacer()
 
-                TrafficLightButton(
-                    isHovering: isHovering,
-                    isActive: store.isDetached,
-                    color: Color(nsColor: .systemCyan),
-                    action: {
-                        store.send(.toggleChatPanelDetachedButtonClicked)
+                if !autoAttachChatToXcode {
+                    TrafficLightButton(
+                        isHovering: isHovering,
+                        isActive: store.isDetached,
+                        color: Color(nsColor: .systemCyan),
+                        action: {
+                            store.send(.toggleChatPanelDetachedButtonClicked)
+                        }
+                    ) {
+                        Image(systemName: "pin.fill")
+                            .foregroundStyle(.black.opacity(0.5))
+                            .font(Font.system(size: 6).weight(.black))
+                            .transformEffect(.init(translationX: 0, y: 0.5))
                     }
-                ) {
-                    Image(systemName: "pin.fill")
-                        .foregroundStyle(.black.opacity(0.5))
-                        .font(Font.system(size: 6).weight(.black))
-                        .transformEffect(.init(translationX: 0, y: 0.5))
                 }
             }
             .buttonStyle(.plain)

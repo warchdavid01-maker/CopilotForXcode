@@ -5,20 +5,27 @@ import Toast
 import XcodeInspector
 
 struct ChatSection: View {
+    @AppStorage(\.autoAttachChatToXcode) var autoAttachChatToXcode
+    
     var body: some View {
         SettingsSection(title: "Chat Settings") {
-            VStack(spacing: 10) {
-                // Response language picker
-                ResponseLanguageSetting()
-                    .padding(.horizontal, 10)
-
-                Divider()
-
-                // Custom instructions
-                CustomInstructionSetting()
-                    .padding(.horizontal, 10)
-            }
-            .padding(.vertical, 10)
+            // Auto Attach toggle
+            SettingsToggle(
+                title: "Auto-attach Chat Window to Xcode", 
+                isOn: $autoAttachChatToXcode
+            )
+            
+            Divider()
+            
+            // Response language picker
+            ResponseLanguageSetting()
+                .padding(SettingsToggle.defaultPadding)
+            
+            Divider()
+            
+            // Custom instructions
+            CustomInstructionSetting()
+                .padding(SettingsToggle.defaultPadding)
         }
     }
 }
