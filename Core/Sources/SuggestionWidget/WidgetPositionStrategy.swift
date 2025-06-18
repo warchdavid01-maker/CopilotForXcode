@@ -320,12 +320,19 @@ enum UpdateLocationStrategy {
         return selectionFrame
     }
     
-    static func getChatPanelFrame(isAttachedToXcodeEnabled: Bool = false) -> CGRect {
+    static func getChatPanelFrame(
+        isAttachedToXcodeEnabled: Bool = false, 
+        xcodeApp: XcodeAppInstanceInspector? = nil
+    ) -> CGRect {
         let screen = NSScreen.main ?? NSScreen.screens.first!
-        return getChatPanelFrame(screen, isAttachedToXcodeEnabled: isAttachedToXcodeEnabled)
+        return getChatPanelFrame(screen, isAttachedToXcodeEnabled: isAttachedToXcodeEnabled, xcodeApp: xcodeApp)
     }
     
-    static func getChatPanelFrame(_ screen: NSScreen, isAttachedToXcodeEnabled: Bool = false) -> CGRect {
+    static func getChatPanelFrame(
+        _ screen: NSScreen, 
+        isAttachedToXcodeEnabled: Bool = false, 
+        xcodeApp: XcodeAppInstanceInspector? = nil
+    ) -> CGRect {
         let visibleScreenFrame = screen.visibleFrame
         
         // Default Frame
@@ -335,7 +342,7 @@ enum UpdateLocationStrategy {
         var y = visibleScreenFrame.minY
         
         if isAttachedToXcodeEnabled,
-           let latestActiveXcode = XcodeInspector.shared.latestActiveXcode,
+           let latestActiveXcode = xcodeApp ?? XcodeInspector.shared.latestActiveXcode,
            let xcodeWindow = latestActiveXcode.appElement.focusedWindow,
            let xcodeScreen = latestActiveXcode.appScreen,
            let xcodeRect = xcodeWindow.rect,

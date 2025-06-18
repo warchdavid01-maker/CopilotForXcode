@@ -1,18 +1,12 @@
-### GitHub Copilot for Xcode 0.36.0
+### GitHub Copilot for Xcode 0.37.0
 
 **🚀 Highlights**
 
-* Introduced a new chat setting "**Response Language**" under **Advanced** settings to customize the natural language used in chat replies.
-* Enabled support for custom instructions defined in _.github/copilot-instructions.md_ within your workspace.
-* Added support for premium request handling.
-
-**💪 Improvements**
-
-* Performance: Improved UI responsiveness by lazily restoring chat history.
-* Performance: Fixed lagging issue when pasting large text into the chat input.
-* Performance: Improved project indexing performance.
+* **Advanced** settings: Added option to configure **Custom Instructions** for GitHub Copilot during chat sessions.
+* **Advanced** settings: Added option to keep the chat window automatically attached to Xcode.
+* Added support for dragging-and-dropping files into the chat panel to provide context.
 
 **🛠️ Bug Fixes**
 
-* Don't trigger / (slash) commands when pasting a file path into the chat input.
-* Adjusted terminal text styling to align with Xcode’s theme.
+* "Add Context" menu didn’t show files in workspaces organized with Xcode’s group feature.
+* Chat didn’t respond when the workspace was in a system folder (like Desktop, Downloads, or Documents) and access permission hadn’t been granted.

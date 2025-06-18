@@ -17,6 +17,9 @@ actor WidgetWindowsController: NSObject {
     nonisolated let chatTabPool: ChatTabPool
 
     var currentApplicationProcessIdentifier: pid_t?
+    
+    weak var currentXcodeApp: XcodeAppInstanceInspector?
+    weak var previousXcodeApp: XcodeAppInstanceInspector?
 
     var cancellable: Set<AnyCancellable> = []
     var observeToAppTask: Task<Void, Error>?
@@ -84,6 +87,12 @@ private extension WidgetWindowsController {
             if app.isXcode {
                 updateWindowLocation(animated: false, immediately: true)
                 updateWindowOpacity(immediately: false)
+                
+                if let xcodeApp = app as? XcodeAppInstanceInspector {
+                    previousXcodeApp = currentXcodeApp ?? xcodeApp
+                    currentXcodeApp = xcodeApp
+                }
+                
             } else {
                 updateWindowOpacity(immediately: true)
                 updateWindowLocation(animated: false, immediately: false)
@@ -149,7 +158,7 @@ private extension WidgetWindowsController {
                     .windowMoved,
                     .windowResized:
                     await updateWidgets(immediately: false)
-                    await updateChatWindowLocation()
+                    await updateAttachedChatWindowLocation(notification)
                 case .created, .uiElementDestroyed, .xcodeCompletionPanelChanged,
                      .applicationDeactivated:
                     continue
@@ -446,14 +455,55 @@ extension WidgetWindowsController {
     }
     
     @MainActor
-    func updateChatWindowLocation() {
-        let state = store.withState { $0 }
-        let isAttachedToXcodeEnabled = UserDefaults.shared.value(for: \.autoAttachChatToXcode)
-        if isAttachedToXcodeEnabled {
-            if state.chatPanelState.isPanelDisplayed && !windows.chatPanelWindow.isWindowHidden {
-                let frame = UpdateLocationStrategy.getChatPanelFrame(isAttachedToXcodeEnabled: isAttachedToXcodeEnabled)
-                windows.chatPanelWindow.setFrame(frame, display: true, animate: true)
+    func updateAttachedChatWindowLocation(_ notif: XcodeAppInstanceInspector.AXNotification? = nil) async {
+        guard let currentXcodeApp = (await currentXcodeApp),
+              let currentFocusedWindow = currentXcodeApp.appElement.focusedWindow,
+              let currentXcodeScreen = currentXcodeApp.appScreen,
+              let currentXcodeRect = currentFocusedWindow.rect
+        else { return }
+        
+        if let previousXcodeApp = (await previousXcodeApp),
+           currentXcodeApp.processIdentifier == previousXcodeApp.processIdentifier {
+            if currentFocusedWindow.isFullScreen == true {
+                return
             }
+        }
+        
+        let isAttachedToXcodeEnabled = UserDefaults.shared.value(for: \.autoAttachChatToXcode)
+        guard isAttachedToXcodeEnabled else { return }
+        
+        if let notif = notif {
+            let dialogIdentifiers = ["open_quickly", "alert"]
+            if dialogIdentifiers.contains(notif.element.identifier) { return }
+        }
+        
+        let state = store.withState { $0 }
+        if state.chatPanelState.isPanelDisplayed && !windows.chatPanelWindow.isWindowHidden {
+            var frame = UpdateLocationStrategy.getChatPanelFrame(
+                isAttachedToXcodeEnabled: true,
+                xcodeApp: currentXcodeApp
+            )
+            
+            let screenMaxX = currentXcodeScreen.visibleFrame.maxX
+            if screenMaxX - currentXcodeRect.maxX < Style.minChatPanelWidth
+            {
+                if let previousXcodeRect = (await previousXcodeApp?.appElement.focusedWindow?.rect),
+                   screenMaxX - previousXcodeRect.maxX < Style.minChatPanelWidth
+                {
+                    let isSameScreen = currentXcodeScreen.visibleFrame.intersects(windows.chatPanelWindow.frame)
+                    // Only update y and height
+                    frame = .init(
+                        x: isSameScreen ? windows.chatPanelWindow.frame.minX : frame.minX,
+                        y: frame.minY,
+                        width: isSameScreen ? windows.chatPanelWindow.frame.width : frame.width,
+                        height: frame.height
+                    )
+                }
+            }
+            
+            windows.chatPanelWindow.setFrame(frame, display: true, animate: true)
+            
+            await adjustChatPanelWindowLevel()
         }
     }
 
@@ -496,7 +546,7 @@ extension WidgetWindowsController {
             
             let isAttachedToXcodeEnabled = UserDefaults.shared.value(for: \.autoAttachChatToXcode)
             if isAttachedToXcodeEnabled {
-                // update in `updateChatWindowLocation`
+                // update in `updateAttachedChatWindowLocation`
             } else if isChatPanelDetached {
                 // don't update it!
             } else {

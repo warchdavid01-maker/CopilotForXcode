@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.37.0 - June 18, 2025
+### Added
+- **Advanced** settings: Added option to configure **Custom Instructions** for GitHub Copilot during chat sessions.
+- **Advanced** settings: Added option to keep the chat window automatically attached to Xcode.
+
+### Changed
+- Enabled support for dragging-and-dropping files into the chat panel to provide context.
+
+### Fixed
+- "Add Context" menu didn’t show files in workspaces organized with Xcode’s group feature.
+- Chat didn’t respond when the workspace was in a system folder (like Desktop, Downloads, or Documents) and access permission hadn’t been granted.
+
 ## 0.36.0 - June 4, 2025
 ### Added
 - Introduced a new chat setting "**Response Language**" under **Advanced** settings to customize the natural language used in chat replies.
