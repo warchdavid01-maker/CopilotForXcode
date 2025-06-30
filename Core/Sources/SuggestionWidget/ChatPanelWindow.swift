@@ -82,7 +82,7 @@ final class ChatPanelWindow: NSWindow {
     }
     
     private func setInitialFrame() {
-        let frame = UpdateLocationStrategy.getChatPanelFrame(isAttachedToXcodeEnabled: false)
+        let frame = UpdateLocationStrategy.getChatPanelFrame()
         setFrame(frame, display: false, animate: true)
     }
 

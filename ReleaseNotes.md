@@ -1,12 +1,17 @@
-### GitHub Copilot for Xcode 0.37.0
+### GitHub Copilot for Xcode 0.38.0
 
 **🚀 Highlights**
 
-* **Advanced** settings: Added option to configure **Custom Instructions** for GitHub Copilot during chat sessions.
-* **Advanced** settings: Added option to keep the chat window automatically attached to Xcode.
-* Added support for dragging-and-dropping files into the chat panel to provide context.
+* Support for Claude 4 in Chat.
+* Support for Copilot Vision (image attachments).
+* Support for remote MCP servers.
+
+**💪 Improvements**
+* Automatically suggests a title for conversations created in agent mode.
+* Improved restoration of MCP tool status after Copilot restarts.
+* Reduced duplication of MCP server instances.
 
 **🛠️ Bug Fixes**
 
-* "Add Context" menu didn’t show files in workspaces organized with Xcode’s group feature.
-* Chat didn’t respond when the workspace was in a system folder (like Desktop, Downloads, or Documents) and access permission hadn’t been granted.
+* Switching accounts now correctly refreshes the auth token and models.
+* Fixed file create/edit issues in agent mode.

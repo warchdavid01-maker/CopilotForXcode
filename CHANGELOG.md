@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.38.0 - June 30, 2025
+### Added
+- Support for Claude 4 in Chat.
+- Support for Copilot Vision (image attachments).
+- Support for remote MCP servers.
+
+### Changed
+- Automatically suggests a title for conversations created in agent mode.
+- Improved restoration of MCP tool status after Copilot restarts.
+- Reduced duplication of MCP server instances.
+
+### Fixed
+- Switching accounts now correctly refreshes the auth token and models.
+- Fixed file create/edit issues in agent mode.
+
 ## 0.37.0 - June 18, 2025
 ### Added
 - **Advanced** settings: Added option to configure **Custom Instructions** for GitHub Copilot during chat sessions.

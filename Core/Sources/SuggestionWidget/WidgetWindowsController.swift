@@ -349,7 +349,7 @@ extension WidgetWindowsController {
     
     // Generate a default location when no workspace is opened
     private func generateDefaultLocation() -> WidgetLocation {
-        let chatPanelFrame = UpdateLocationStrategy.getChatPanelFrame(isAttachedToXcodeEnabled: false)
+        let chatPanelFrame = UpdateLocationStrategy.getChatPanelFrame()
         
         return WidgetLocation(
             widgetFrame: .zero,
@@ -459,7 +459,8 @@ extension WidgetWindowsController {
         guard let currentXcodeApp = (await currentXcodeApp),
               let currentFocusedWindow = currentXcodeApp.appElement.focusedWindow,
               let currentXcodeScreen = currentXcodeApp.appScreen,
-              let currentXcodeRect = currentFocusedWindow.rect
+              let currentXcodeRect = currentFocusedWindow.rect,
+              let notif = notif
         else { return }
         
         if let previousXcodeApp = (await previousXcodeApp),
@@ -472,16 +473,13 @@ extension WidgetWindowsController {
         let isAttachedToXcodeEnabled = UserDefaults.shared.value(for: \.autoAttachChatToXcode)
         guard isAttachedToXcodeEnabled else { return }
         
-        if let notif = notif {
-            let dialogIdentifiers = ["open_quickly", "alert"]
-            if dialogIdentifiers.contains(notif.element.identifier) { return }
-        }
+        guard notif.element.isXcodeWorkspaceWindow else { return }
         
         let state = store.withState { $0 }
         if state.chatPanelState.isPanelDisplayed && !windows.chatPanelWindow.isWindowHidden {
-            var frame = UpdateLocationStrategy.getChatPanelFrame(
-                isAttachedToXcodeEnabled: true,
-                xcodeApp: currentXcodeApp
+            var frame = UpdateLocationStrategy.getAttachedChatPanelFrame(
+                NSScreen.main ?? NSScreen.screens.first!, 
+                workspaceWindowElement: notif.element
             )
             
             let screenMaxX = currentXcodeScreen.visibleFrame.maxX
