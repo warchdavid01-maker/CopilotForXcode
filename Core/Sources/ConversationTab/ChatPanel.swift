@@ -499,7 +499,7 @@ struct ChatPanelInputArea: View {
         var focusedField: FocusState<Chat.State.Field?>.Binding
         @State var cancellable = Set<AnyCancellable>()
         @State private var isFilePickerPresented = false
-        @State private var allFiles: [FileReference] = []
+        @State private var allFiles: [FileReference]? = nil
         @State private var filteredTemplates: [ChatTemplate] = []
         @State private var filteredAgent: [ChatAgent] = []
         @State private var showingTemplates = false
@@ -528,7 +528,7 @@ struct ChatPanelInputArea: View {
                             }
                         )
                         .onAppear() {
-                            allFiles = ContextUtils.getFilesInActiveWorkspace(workspaceURL: chat.workspaceURL)
+                            allFiles = ContextUtils.getFilesFromWorkspaceIndex(workspaceURL: chat.workspaceURL)
                         }
                     }
                     

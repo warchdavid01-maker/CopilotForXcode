@@ -39,10 +39,6 @@ struct MCPConfigView: View {
         }
     }
 
-    private func wrapBinding<T>(_ b: Binding<T>) -> Binding<T> {
-        DebouncedBinding(b, handler: refreshConfiguration).binding
-    }
-
     private func setupConfigFilePath() {
         let fileManager = FileManager.default
 
@@ -162,8 +158,8 @@ struct MCPConfigView: View {
         }
 
         Task {
-            let service = try getService()
             do {
+                let service = try getService()
                 try await service.postNotification(
                     name: Notification.Name
                         .gitHubCopilotShouldRefreshEditorInformation.rawValue

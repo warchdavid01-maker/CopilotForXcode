@@ -277,7 +277,7 @@ public struct WorkspaceFile {
         projectURL: URL,
         excludeGitIgnoredFiles: Bool,
         excludeIDEIgnoredFiles: Bool
-    ) -> [String] {
+    ) -> [FileReference] {
         // Directly return for invalid workspace
         guard workspaceURL.path != "/" else { return [] }
         
@@ -290,6 +290,6 @@ public struct WorkspaceFile {
             shouldExcludeFile: shouldExcludeFile
         )
         
-        return files.map { $0.url.absoluteString }
+        return files
     }
 }

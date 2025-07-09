@@ -75,6 +75,56 @@ class MockWorkspaceFileProvider: WorkspaceFileProvider {
     func isXCWorkspace(_ url: URL) -> Bool {
         return xcWorkspacePaths.contains(url.path)
     }
+
+    func fileExists(atPath: String) -> Bool {
+        return true
+    }
+}
+
+class MockFileWatcher: FileWatcherProtocol {
+    var fileURL: URL
+    var dispatchQueue: DispatchQueue?
+    var onFileModified: (() -> Void)?
+    var onFileDeleted: (() -> Void)?
+    var onFileRenamed: (() -> Void)?
+
+    static var watchers = [URL: MockFileWatcher]()
+
+    init(fileURL: URL, dispatchQueue: DispatchQueue? = nil, onFileModified: (() -> Void)? = nil, onFileDeleted: (() -> Void)? = nil, onFileRenamed: (() -> Void)? = nil) {
+        self.fileURL = fileURL
+        self.dispatchQueue = dispatchQueue
+        self.onFileModified = onFileModified
+        self.onFileDeleted = onFileDeleted
+        self.onFileRenamed = onFileRenamed
+        MockFileWatcher.watchers[fileURL] = self
+    }
+
+    func startWatching() -> Bool {
+        return true
+    }
+
+    func stopWatching() {
+        MockFileWatcher.watchers[fileURL] = nil
+    }
+
+    static func triggerFileDelete(for fileURL: URL) {
+        guard let watcher = watchers[fileURL] else { return }
+        watcher.onFileDeleted?()
+    }
+}
+
+class MockFileWatcherFactory: FileWatcherFactory {
+    func createFileWatcher(fileURL: URL, dispatchQueue: DispatchQueue?, onFileModified: (() -> Void)?, onFileDeleted: (() -> Void)?, onFileRenamed: (() -> Void)?) -> FileWatcherProtocol {
+        return MockFileWatcher(fileURL: fileURL, dispatchQueue: dispatchQueue, onFileModified: onFileModified, onFileDeleted: onFileDeleted, onFileRenamed: onFileRenamed)
+    }
+    
+    func createDirectoryWatcher(watchedPaths: [URL], changePublisher: @escaping PublisherType, publishInterval: TimeInterval) -> DirectoryWatcherProtocol {
+        return BatchingFileChangeWatcher(
+            watchedPaths: watchedPaths,
+            changePublisher: changePublisher,
+            fsEventProvider: MockFSEventProvider()
+        )
+    }
 }
 
 // MARK: - Tests for BatchingFileChangeWatcher
@@ -193,13 +243,11 @@ extension BatchingFileChangeWatcherTests {
 final class FileChangeWatcherServiceTests: XCTestCase {
     var mockWorkspaceFileProvider: MockWorkspaceFileProvider!
     var publishedEvents: [[FileEvent]] = []
-    var createdWatchers: [[URL]: BatchingFileChangeWatcher] = [:]
     
     override func setUp() {
         super.setUp()
         mockWorkspaceFileProvider = MockWorkspaceFileProvider()
         publishedEvents = []
-        createdWatchers = [:]
     }
     
     func createService(workspaceURL: URL = URL(fileURLWithPath: "/test/workspace")) -> FileChangeWatcherService {
@@ -209,17 +257,8 @@ final class FileChangeWatcherServiceTests: XCTestCase {
                 self?.publishedEvents.append(events)
             },
             publishInterval: 0.1,
-            projectWatchingInterval: 0.1,
             workspaceFileProvider: mockWorkspaceFileProvider,
-            watcherFactory: { projectURLs, publisher in
-                let watcher = BatchingFileChangeWatcher(
-                    watchedPaths: projectURLs,
-                    changePublisher: publisher,
-                    fsEventProvider: MockFSEventProvider()
-                )
-                self.createdWatchers[projectURLs] = watcher
-                return watcher
-            }
+            watcherFactory: MockFileWatcherFactory()
         )
     }
     
@@ -231,26 +270,28 @@ final class FileChangeWatcherServiceTests: XCTestCase {
         let service = createService()
         service.startWatching()
         
-        XCTAssertEqual(createdWatchers.count, 1)
-        XCTAssertNotNil(createdWatchers[[project1, project2]])
+        XCTAssertNotNil(service.watcher)
+        XCTAssertEqual(service.watcher?.paths().count, 2)
+        XCTAssertEqual(service.watcher?.paths(), [project1, project2])
     }
     
     func testStartWatchingDoesNotCreateWatcherForRootDirectory() {
         let service = createService(workspaceURL: URL(fileURLWithPath: "/"))
         service.startWatching()
         
-        XCTAssertTrue(createdWatchers.isEmpty)
+        XCTAssertNil(service.watcher)
     }
     
     func testProjectMonitoringDetectsAddedProjects() {
         let workspace = URL(fileURLWithPath: "/test/workspace")
         let project1 = URL(fileURLWithPath: "/test/workspace/project1")
         mockWorkspaceFileProvider.subprojects = [project1]
+        mockWorkspaceFileProvider.xcWorkspacePaths = [workspace.path]
         
         let service = createService(workspaceURL: workspace)
         service.startWatching()
         
-        XCTAssertEqual(createdWatchers.count, 1)
+        XCTAssertNotNil(service.watcher)
         
         // Simulate adding a new project
         let project2 = URL(fileURLWithPath: "/test/workspace/project2")
@@ -271,9 +312,9 @@ final class FileChangeWatcherServiceTests: XCTestCase {
         )
         mockWorkspaceFileProvider.filesInWorkspace = [file1, file2]
 
-        XCTAssertTrue(waitForPublishedEvents(), "No events were published within timeout")
+        MockFileWatcher.triggerFileDelete(for: workspace.appendingPathComponent("contents.xcworkspacedata"))
         
-        XCTAssertEqual(createdWatchers.count, 1)
+        XCTAssertTrue(waitForPublishedEvents(), "No events were published within timeout")
         
         guard !publishedEvents.isEmpty else { return }
         
@@ -290,11 +331,12 @@ final class FileChangeWatcherServiceTests: XCTestCase {
         let project1 = URL(fileURLWithPath: "/test/workspace/project1")
         let project2 = URL(fileURLWithPath: "/test/workspace/project2")
         mockWorkspaceFileProvider.subprojects = [project1, project2]
+        mockWorkspaceFileProvider.xcWorkspacePaths = [workspace.path]
         
         let service = createService(workspaceURL: workspace)
         service.startWatching()
         
-        XCTAssertEqual(createdWatchers.count, 1)
+        XCTAssertNotNil(service.watcher)
         
         // Simulate removing a project
         mockWorkspaceFileProvider.subprojects = [project1]
@@ -316,13 +358,12 @@ final class FileChangeWatcherServiceTests: XCTestCase {
         
         // Clear published events from setup
         publishedEvents = []
+
+        MockFileWatcher.triggerFileDelete(for: workspace.appendingPathComponent("contents.xcworkspacedata"))
                 
         XCTAssertTrue(waitForPublishedEvents(), "No events were published within timeout")
             
         guard !publishedEvents.isEmpty else { return }
-        
-        // Verify the watcher was removed
-        XCTAssertEqual(createdWatchers.count, 1)
         
         // Verify file events were published
         XCTAssertEqual(publishedEvents[0].count, 2)

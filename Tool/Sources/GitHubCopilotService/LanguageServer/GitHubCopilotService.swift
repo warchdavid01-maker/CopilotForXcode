@@ -667,7 +667,7 @@ public final class GitHubCopilotService:
     }
 
     private func conversationRequestTimeout(_ agentMode: Bool) -> TimeInterval {
-        return agentMode ? 86400 /* 24h for agent mode timeout */ : 90
+        return agentMode ? 86400 /* 24h for agent mode timeout */ : 600 /* ask mode timeout */
     }
 
     @GitHubCopilotSuggestionActor

@@ -5,7 +5,7 @@ import SwiftUI
 import SystemUtils
 
 public struct FilePicker: View {
-    @Binding var allFiles: [FileReference]
+    @Binding var allFiles: [FileReference]?
     let workspaceURL: URL?
     var onSubmit: (_ file: FileReference) -> Void
     var onExit: () -> Void
@@ -14,20 +14,21 @@ public struct FilePicker: View {
     @State private var selectedId: Int = 0
     @State private var localMonitor: Any? = nil
 
-    private var filteredFiles: [FileReference] {
+    private var filteredFiles: [FileReference]? {
         if searchText.isEmpty {
             return allFiles
         }
 
-        return allFiles.filter { doc in
+        return allFiles?.filter { doc in
             (doc.fileName ?? doc.url.lastPathComponent) .localizedCaseInsensitiveContains(searchText)
         }
     }
     
     private static let defaultEmptyStateText = "No results found."
+    private static let isIndexingStateText = "Indexing files, try later..."
     
     private var emptyStateAttributedString: AttributedString? {
-        var message = FilePicker.defaultEmptyStateText
+        var message = allFiles == nil ? FilePicker.isIndexingStateText : FilePicker.defaultEmptyStateText
         if let workspaceURL = workspaceURL {
             let status = FileUtils.checkFileReadability(at: workspaceURL.path)
             if let errorMessage = status.errorMessage(using: ContextUtils.workspaceReadabilityErrorMessageProvider) {
@@ -89,25 +90,25 @@ public struct FilePicker: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 4) {
-                            ForEach(Array(filteredFiles.enumerated()), id: \.element) { index, doc in
-                                FileRowView(doc: doc, id: index, selectedId: $selectedId)
-                                    .contentShape(Rectangle())
-                                    .onTapGesture {
-                                        onSubmit(doc)
-                                        selectedId = index
-                                        isSearchBarFocused = true
-                                    }
-                                    .id(index)
-                            }
-                            
-                            if filteredFiles.isEmpty {
+                            if allFiles == nil || filteredFiles?.isEmpty == true {
                                 emptyStateView
                                     .foregroundColor(.secondary)
                                     .padding(.leading, 4)
                                     .padding(.vertical, 4)
+                            } else {
+                                ForEach(Array((filteredFiles ?? []).enumerated()), id: \.element) { index, doc in
+                                    FileRowView(doc: doc, id: index, selectedId: $selectedId)
+                                        .contentShape(Rectangle())
+                                        .onTapGesture {
+                                            onSubmit(doc)
+                                            selectedId = index
+                                            isSearchBarFocused = true
+                                        }
+                                        .id(index)
+                                }
                             }
                         }
-                        .id(filteredFiles.hashValue)
+                        .id(filteredFiles?.hashValue)
                     }
                     .frame(maxHeight: 200)
                     .padding(.horizontal, 4)
@@ -158,16 +159,14 @@ public struct FilePicker: View {
     }
 
     private func moveSelection(up: Bool, proxy: ScrollViewProxy) {
-        let files = filteredFiles
-        guard !files.isEmpty else { return }
+        guard let files = filteredFiles, !files.isEmpty else { return }
         let nextId = selectedId + (up ? -1 : 1)
         selectedId = max(0, min(nextId, files.count - 1))
         proxy.scrollTo(selectedId, anchor: .bottom)
     }
 
     private func handleEnter() {
-        let files = filteredFiles
-        guard !files.isEmpty && selectedId < files.count else { return }
+        guard let files = filteredFiles, !files.isEmpty && selectedId < files.count else { return }
         onSubmit(files[selectedId])
     }
 }
@@ -192,9 +191,13 @@ struct FileRowView: View {
                     Text(doc.fileName ?? doc.url.lastPathComponent)
                         .font(.body)
                         .hoverPrimaryForeground(isHovered: selectedId == id)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
                     Text(doc.relativePath ?? doc.url.path)
                         .font(.caption)
                         .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
                 }
                 
                 Spacer()
@@ -206,7 +209,7 @@ struct FileRowView: View {
             .onHover(perform: { hovering in
                 isHovered = hovering
             })
-            .transition(.move(edge: .bottom))
+            .help(doc.relativePath ?? doc.url.path)
         }
     }
 }

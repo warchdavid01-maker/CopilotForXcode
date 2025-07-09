@@ -1,22 +1,9 @@
 import Foundation
 import System
 import Logger
-import CoreServices
 import LanguageServerProtocol
-import XcodeInspector
 
-public typealias PublisherType = (([FileEvent]) -> Void)
-
-protocol FileChangeWatcher {
-    func onFileCreated(file: URL)
-    func onFileChanged(file: URL)
-    func onFileDeleted(file: URL)
-    
-    func addPaths(_ paths: [URL])
-    func removePaths(_ paths: [URL])
-}
-
-public final class BatchingFileChangeWatcher: FileChangeWatcher {
+public final class BatchingFileChangeWatcher: DirectoryWatcherProtocol {
     private var watchedPaths: [URL]
     private let changePublisher: PublisherType
     private let publishInterval: TimeInterval
@@ -30,9 +17,7 @@ public final class BatchingFileChangeWatcher: FileChangeWatcher {
     
     // Dependencies injected for testing
     private let fsEventProvider: FSEventProvider
-    
-    public var paths: [URL] { watchedPaths }
-    
+
     /// TODO: set a proper value for stdio
     public static let maxEventPublishSize = 100
     
@@ -73,7 +58,11 @@ public final class BatchingFileChangeWatcher: FileChangeWatcher {
             updateWatchedPaths(updatedPaths)
         }
     }
-    
+
+    public func paths() -> [URL] {
+        return watchedPaths
+    }
+
     internal func start() {
         guard !isWatching else { return }
         
@@ -161,7 +150,8 @@ public final class BatchingFileChangeWatcher: FileChangeWatcher {
     }
     
     /// Starts watching  for file changes in the project
-    private func startWatching() -> Bool {
+    public func startWatching() -> Bool {
+        isWatching = true
         var isEventStreamStarted = false
         
         var context = FSEventStreamContext()
@@ -196,7 +186,7 @@ public final class BatchingFileChangeWatcher: FileChangeWatcher {
     }
     
     /// Stops watching for file changes
-    internal func stopWatching() {
+    public func stopWatching() {
         guard isWatching, let eventStream = eventStream else { return }
         
         fsEventProvider.stopStream(eventStream)
@@ -261,144 +251,5 @@ extension BatchingFileChangeWatcher {
         // TODO: check if url is ignored by git / ide
         
         return false
-    }
-}
-
-public class FileChangeWatcherService {
-    internal var watcher: BatchingFileChangeWatcher?
-    /// for watching projects added or removed
-    private var timer: Timer?
-    private var projectWatchingInterval: TimeInterval
-    
-    private(set) public var workspaceURL: URL
-    private(set) public var publisher: PublisherType
-    
-    // Dependencies injected for testing
-    internal let workspaceFileProvider: WorkspaceFileProvider
-    internal let watcherFactory: ([URL], @escaping PublisherType) -> BatchingFileChangeWatcher
-        
-    public init(
-        _ workspaceURL: URL,
-        publisher: @escaping PublisherType,
-        publishInterval: TimeInterval = 3.0,
-        projectWatchingInterval: TimeInterval = 300.0,
-        workspaceFileProvider: WorkspaceFileProvider = FileChangeWatcherWorkspaceFileProvider(),
-        watcherFactory: (([URL], @escaping PublisherType) -> BatchingFileChangeWatcher)? = nil
-    ) {
-        self.workspaceURL = workspaceURL
-        self.publisher = publisher
-        self.workspaceFileProvider = workspaceFileProvider
-        self.watcherFactory = watcherFactory ?? { projectURLs, publisher in
-            BatchingFileChangeWatcher(watchedPaths: projectURLs, changePublisher: publisher, publishInterval: publishInterval)
-        }
-        self.projectWatchingInterval = projectWatchingInterval
-    }
-    
-    deinit {
-        self.watcher = nil
-        self.timer?.invalidate()
-    }
-    
-    internal func startWatchingProject() {
-        guard timer == nil else { return }
-        
-        Task { @MainActor [weak self] in
-            guard let self else { return }
-            
-            self.timer = Timer.scheduledTimer(withTimeInterval: self.projectWatchingInterval, repeats: true) { [weak self] _ in
-                guard let self, let watcher = self.watcher else { return }
-                
-                let watchingProjects = Set(watcher.paths)
-                let projects = Set(self.workspaceFileProvider.getProjects(by: self.workspaceURL))
-                
-                /// find added projects
-                let addedProjects = projects.subtracting(watchingProjects)
-                self.onProjectAdded(Array(addedProjects))
-                
-                /// find removed projects
-                let removedProjects = watchingProjects.subtracting(projects)
-                self.onProjectRemoved(Array(removedProjects))
-            }
-        }
-    }
-    
-    public func startWatching() {
-        guard workspaceURL.path != "/" else { return }
-        
-        guard watcher == nil else { return }
-
-        let projects = workspaceFileProvider.getProjects(by: workspaceURL)
-        guard projects.count > 0 else { return }
-        
-        watcher = watcherFactory(projects, publisher)
-        Logger.client.info("Started watching for file changes in \(projects)")
-        
-        startWatchingProject()
-    }
-    
-    internal func onProjectAdded(_ projectURLs: [URL]) {
-        guard let watcher = watcher, projectURLs.count > 0 else { return }
-        
-        watcher.addPaths(projectURLs)
-
-        Logger.client.info("Started watching for file changes in \(projectURLs)")
-        
-        /// sync all the files as created in the project when added
-        for projectURL in projectURLs {
-            let files = workspaceFileProvider.getFilesInActiveWorkspace(
-                workspaceURL: projectURL,
-                workspaceRootURL: projectURL
-            )
-            publisher(files.map { .init(uri: $0.url.absoluteString, type: .created) })
-        }
-    }
-    
-    internal func onProjectRemoved(_ projectURLs: [URL]) {
-        guard let watcher = watcher, projectURLs.count > 0 else { return }
-        
-        watcher.removePaths(projectURLs)
-        
-        Logger.client.info("Stopped watching for file changes in \(projectURLs)")
-        
-        /// sync all the files as deleted in the project when removed
-        for projectURL in projectURLs {
-            let files = workspaceFileProvider.getFilesInActiveWorkspace(workspaceURL: projectURL, workspaceRootURL: projectURL)
-            publisher(files.map { .init(uri: $0.url.absoluteString, type: .deleted) })
-        }
-    }
-}
-
-@globalActor
-public enum PoolActor: GlobalActor {
-    public actor Actor {}
-    public static let shared = Actor()
-}
-
-public class FileChangeWatcherServicePool {
-    
-    public static let shared = FileChangeWatcherServicePool()
-    private var servicePool: [URL: FileChangeWatcherService] = [:]
-    
-    private init() {}
-    
-    @PoolActor
-    public func watch(for workspaceURL: URL, publisher: @escaping PublisherType) {
-        guard workspaceURL.path != "/" else { return }
-        
-        var validWorkspaceURL: URL? = nil
-        if WorkspaceFile.isXCWorkspace(workspaceURL) {
-            validWorkspaceURL = workspaceURL
-        } else if WorkspaceFile.isXCProject(workspaceURL) {
-            validWorkspaceURL = WorkspaceFile.getWorkspaceByProject(workspaceURL)
-        }
-        
-        guard let validWorkspaceURL else { return }
-        
-        guard servicePool[workspaceURL] == nil else { return }
-        
-        let watcherService = FileChangeWatcherService(validWorkspaceURL, publisher: publisher)
-        watcherService.startWatching()
-        
-        servicePool[workspaceURL] = watcherService
     }
 }

@@ -40,8 +40,8 @@ struct ChatWindowView: View {
                         ChatLoginView(viewModel: GitHubCopilotViewModel.shared)
                     case .notAuthorized:
                         ChatNoSubscriptionView(viewModel: GitHubCopilotViewModel.shared)
-                    default:
-                        ChatLoadingView()
+                    case .unknown:
+                        ChatLoginView(viewModel: GitHubCopilotViewModel.shared)
                     }
                 }
             }

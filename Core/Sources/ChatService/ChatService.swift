@@ -95,7 +95,6 @@ public final class ChatService: ChatServiceType, ObservableObject {
         
         subscribeToNotifications()
         subscribeToConversationContextRequest()
-        subscribeToWatchedFilesHandler()
         subscribeToClientToolInvokeEvent()
         subscribeToClientToolConfirmationEvent()
     }
@@ -141,13 +140,6 @@ public final class ChatService: ChatServiceType, ObservableObject {
                     skill.resolveSkill(request: request, completion: completion)
                 }
             }
-        }).store(in: &cancellables)
-    }
-    
-    private func subscribeToWatchedFilesHandler() {
-        self.watchedFilesHandler.onWatchedFiles.sink(receiveValue: { [weak self] (request, completion) in
-            guard let self, request.params!.workspaceFolder.uri != "/" else { return }
-            self.startFileChangeWatcher()
         }).store(in: &cancellables)
     }
 
@@ -1041,26 +1033,6 @@ extension ChatService {
     
     func fetchAllChatMessagesFromStorage() -> [ChatMessage] {
         return ChatMessageStore.getAll(by: self.chatTabInfo.id, metadata: .init(workspacePath: self.chatTabInfo.workspacePath, username: self.chatTabInfo.username))
-    }
-    
-    /// for file change watcher
-    func startFileChangeWatcher() {
-        Task { [weak self] in
-            guard let self else { return }
-            let workspaceURL = URL(fileURLWithPath: self.chatTabInfo.workspacePath)
-            let projectURL = WorkspaceXcodeWindowInspector.extractProjectURL(workspaceURL: workspaceURL, documentURL: nil) ?? workspaceURL
-            await FileChangeWatcherServicePool.shared.watch(
-                for: workspaceURL
-            ) { fileEvents in
-                Task { [weak self] in
-                    guard let self else { return }
-                    try? await self.conversationProvider?.notifyDidChangeWatchedFiles(
-                        .init(workspaceUri: projectURL.path, changes: fileEvents),
-                        workspace: .init(workspaceURL: workspaceURL, projectURL: projectURL)
-                    )
-                }
-            }
-        }
     }
 }
 
