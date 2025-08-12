@@ -286,41 +286,6 @@ public class GitHubCopilotBaseService {
 
         self.server = server
         localProcessServer = localServer
-
-        Task { [weak self] in
-            if projectRootURL.path != "/" {
-                try? await server.sendNotification(
-                    .workspaceDidChangeWorkspaceFolders(
-                        .init(event: .init(added: [.init(uri: projectRootURL.absoluteString, name: projectRootURL.lastPathComponent)], removed: []))
-                    )
-                )
-            }
-            
-            func sendConfigurationUpdate() async {
-                let includeMCP = projectRootURL.path != "/" &&
-                    FeatureFlagNotifierImpl.shared.featureFlags.agentMode &&
-                    FeatureFlagNotifierImpl.shared.featureFlags.mcp
-                _ = try? await server.sendNotification(
-                    .workspaceDidChangeConfiguration(
-                        .init(settings: editorConfiguration(includeMCP: includeMCP))
-                    )
-                )
-            }
-
-            // Send initial configuration after initialize
-            await sendConfigurationUpdate()
-            
-            // Combine both notification streams
-            let combinedNotifications = Publishers.Merge(
-                NotificationCenter.default.publisher(for: .gitHubCopilotShouldRefreshEditorInformation).map { _ in "editorInfo" },
-                FeatureFlagNotifierImpl.shared.featureFlagsDidChange.map { _ in "featureFlags" }
-            )
-            
-            for await _ in combinedNotifications.values {
-                guard self != nil else { return }
-                await sendConfigurationUpdate()
-            }
-        }
     }
     
     
@@ -430,6 +395,7 @@ public final class GitHubCopilotService:
     private var isMCPInitialized = false
     private var unrestoredMcpServers: [String] = []
     private var mcpRuntimeLogFileName: String = ""
+    private var lastSentConfiguration: JSONValue?
 
     override init(designatedServer: any GitHubCopilotLSP) {
         super.init(designatedServer: designatedServer)
@@ -438,6 +404,8 @@ public final class GitHubCopilotService:
     override public init(projectRootURL: URL = URL(fileURLWithPath: "/"), workspaceURL: URL = URL(fileURLWithPath: "/")) throws {
         do {
             try super.init(projectRootURL: projectRootURL, workspaceURL: workspaceURL)
+
+            self.handleSendWorkspaceDidChangeNotifications()
             
             localProcessServer?.notificationPublisher.sink(receiveValue: { [weak self] notification in
                 if notification.method == "copilot/mcpTools" && projectRootURL.path != "/" {
@@ -467,6 +435,9 @@ public final class GitHubCopilotService:
                     case let .request(id, request):
                         switch request {
                         case let .custom(method, params, callback):
+                            if method == "copilot/mcpOAuth" && projectRootURL.path == "/" {
+                                continue
+                            }
                             self.serverRequestHandler.handleRequest(.init(id: id, method: method, params: params), workspaceURL: workspaceURL, callback: callback, service: self)
                         default:
                             break
@@ -727,6 +698,18 @@ public final class GitHubCopilotService:
         do {
             let response = try await sendRequest(
                 GitHubCopilotRequest.GetAgents()
+            )
+            return response
+        } catch {
+            throw error
+        }
+    }
+    
+    @GitHubCopilotSuggestionActor
+    public func reviewChanges(params: ReviewChangesParams) async throws -> CodeReviewResult {
+        do {
+            let response = try await sendRequest(
+                GitHubCopilotRequest.ReviewChanges(params: params)
             )
             return response
         } catch {
@@ -1238,6 +1221,51 @@ public final class GitHubCopilotService:
         // Use a combination of name and hash of path for uniqueness
         let pathHash = String(workspacePath.hash.magnitude, radix: 36).prefix(6)
         return "\(workspaceName)-\(pathHash)"
+    }
+    
+    public func handleSendWorkspaceDidChangeNotifications() {
+        Task {
+            if projectRootURL.path != "/" {
+                try? await self.server.sendNotification(
+                    .workspaceDidChangeWorkspaceFolders(
+                        .init(event: .init(added: [.init(uri: projectRootURL.absoluteString, name: projectRootURL.lastPathComponent)], removed: []))
+                    )
+                )
+            }
+            
+            // Send initial configuration after initialize
+            await sendConfigurationUpdate()
+            
+            // Combine both notification streams
+            let combinedNotifications = Publishers.Merge(
+                NotificationCenter.default.publisher(for: .gitHubCopilotShouldRefreshEditorInformation).map { _ in "editorInfo" },
+                FeatureFlagNotifierImpl.shared.featureFlagsDidChange.map { _ in "featureFlags" }
+            )
+            
+            for await _ in combinedNotifications.values {
+                await sendConfigurationUpdate()
+            }
+        }
+    }
+    
+    private func sendConfigurationUpdate() async {
+        let includeMCP = projectRootURL.path != "/" &&
+            FeatureFlagNotifierImpl.shared.featureFlags.agentMode &&
+            FeatureFlagNotifierImpl.shared.featureFlags.mcp
+        
+        let newConfiguration = editorConfiguration(includeMCP: includeMCP)
+        
+        // Only send the notification if the configuration has actually changed
+        guard self.lastSentConfiguration != newConfiguration else { return }
+        
+        _ = try? await self.server.sendNotification(
+            .workspaceDidChangeConfiguration(
+                .init(settings: newConfiguration)
+            )
+        )
+        
+        // Cache the sent configuration
+        self.lastSentConfiguration = newConfiguration
     }
 }
 

@@ -36,6 +36,10 @@ public struct WidgetFeature {
         // MARK: ChatPanel
 
         public var chatPanelState = ChatPanelFeature.State()
+        
+        // MARK: CodeReview
+        
+        public var codeReviewPanelState = CodeReviewPanelFeature.State()
 
         // MARK: CircularWidget
 
@@ -111,6 +115,7 @@ public struct WidgetFeature {
         case panel(PanelFeature.Action)
         case chatPanel(ChatPanelFeature.Action)
         case circularWidget(CircularWidgetFeature.Action)
+        case codeReviewPanel(CodeReviewPanelFeature.Action)
     }
 
     var windowsController: WidgetWindowsController? {
@@ -137,6 +142,10 @@ public struct WidgetFeature {
 
         Scope(state: \._internalCircularWidgetState, action: \.circularWidget) {
             CircularWidgetFeature()
+        }
+        
+        Scope(state: \.codeReviewPanelState, action: \.codeReviewPanel) {
+            CodeReviewPanelFeature()
         }
 
         Reduce { state, action in
@@ -398,6 +407,9 @@ public struct WidgetFeature {
                 return .none
 
             case .chatPanel:
+                return .none
+                
+            case .codeReviewPanel:
                 return .none
             }
         }

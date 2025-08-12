@@ -10,6 +10,8 @@ import ChatTab
 import ConversationServiceProvider
 import SwiftUIFlowLayout
 
+private let MAX_TEXT_LENGTH = 10000 // Maximum characters to prevent crashes
+
 struct UserMessage: View {
     var r: Double { messageBubbleCornerRadius }
     let id: String
@@ -37,6 +39,14 @@ struct UserMessage: View {
         }
     }
 
+    // Truncate the displayed user message if it's too long.
+    private var displayText: String {
+        if text.count > MAX_TEXT_LENGTH {
+            return String(text.prefix(MAX_TEXT_LENGTH)) + "\n… (message too long, rest hidden)"
+        }
+        return text
+    }
+
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 8) {
@@ -50,7 +60,7 @@ struct UserMessage: View {
                     Spacer()
                 }
                 
-                ThemedMarkdownText(text: text, chat: chat)
+                ThemedMarkdownText(text: displayText, chat: chat)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 
                 if !imageReferences.isEmpty {

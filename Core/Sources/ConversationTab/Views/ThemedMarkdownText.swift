@@ -6,7 +6,17 @@ import ComposableArchitecture
 import SuggestionBasic
 import ChatTab
 
-struct ThemedMarkdownText: View {
+public struct MarkdownActionProvider {
+    let supportInsert: Bool
+    let onInsert: ((String) -> Void)?
+    
+    public init(supportInsert: Bool = true, onInsert: ((String) -> Void)? = nil) {
+        self.supportInsert = supportInsert
+        self.onInsert = onInsert
+    }
+}
+
+public struct ThemedMarkdownText: View {
     @AppStorage(\.syncChatCodeHighlightTheme) var syncCodeHighlightTheme
     @AppStorage(\.codeForegroundColorLight) var codeForegroundColorLight
     @AppStorage(\.codeBackgroundColorLight) var codeBackgroundColorLight
@@ -17,14 +27,22 @@ struct ThemedMarkdownText: View {
     @Environment(\.colorScheme) var colorScheme
 
     let text: String
-    let chat: StoreOf<Chat>
+    let context: MarkdownActionProvider
 
+    public init(text: String, context: MarkdownActionProvider) {
+        self.text = text
+        self.context = context
+    }
+    
     init(text: String, chat: StoreOf<Chat>) {
         self.text = text
-        self.chat = chat
+        
+        self.context = .init(onInsert: { content in 
+            chat.send(.insertCode(content))
+        })
     }
 
-    var body: some View {
+    public var body: some View {
         Markdown(text)
             .textSelection(.enabled)
             .markdownTheme(.custom(
@@ -53,7 +71,7 @@ struct ThemedMarkdownText: View {
                     }
                     return Color.secondary.opacity(0.7)
                 }(),
-                chat: chat
+                context: context
             ))
     }
 }
@@ -66,7 +84,7 @@ extension MarkdownUI.Theme {
         codeFont: NSFont,
         codeBlockBackgroundColor: Color,
         codeBlockLabelColor: Color,
-        chat: StoreOf<Chat>
+        context: MarkdownActionProvider
     ) -> MarkdownUI.Theme {
         .gitHub.text {
             ForegroundColor(.primary)
@@ -79,7 +97,7 @@ extension MarkdownUI.Theme {
                 codeFont: codeFont,
                 codeBlockBackgroundColor: codeBlockBackgroundColor,
                 codeBlockLabelColor: codeBlockLabelColor,
-                chat: chat
+                context: context
             )
         }
     }
@@ -90,11 +108,7 @@ struct MarkdownCodeBlockView: View {
     let codeFont: NSFont
     let codeBlockBackgroundColor: Color
     let codeBlockLabelColor: Color
-    let chat: StoreOf<Chat>
-    
-    func insertCode() {
-        chat.send(.insertCode(codeBlockConfiguration.content))
-    }
+    let context: MarkdownActionProvider
     
     var body: some View {
         let wrapCode = UserDefaults.shared.value(for: \.wrapCodeInChatCodeBlock)
@@ -110,7 +124,7 @@ struct MarkdownCodeBlockView: View {
                 codeBlockConfiguration,
                 backgroundColor: codeBlockBackgroundColor,
                 labelColor: codeBlockLabelColor,
-                insertAction: insertCode
+                context: context
             )
         } else {
             ScrollView(.horizontal) {
@@ -126,7 +140,7 @@ struct MarkdownCodeBlockView: View {
                 codeBlockConfiguration,
                 backgroundColor: codeBlockBackgroundColor,
                 labelColor: codeBlockLabelColor,
-                insertAction: insertCode
+                context: context
             )
         }
     }
@@ -143,7 +157,7 @@ struct ThemedMarkdownText_Previews: PreviewProvider {
     }
     ```
     """,
-            chat: .init(initialState: .init(), reducer: { Chat(service: ChatService.service(for: chatTabInfo)) }))
+            context: .init(onInsert: {_ in  print("Inserted") }))
     }
 }
 

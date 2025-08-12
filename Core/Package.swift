@@ -182,7 +182,9 @@ let package = Package(
                     .product(name: "Terminal", package: "Tool"),
                     .product(name: "SystemUtils", package: "Tool"),
                     .product(name: "AppKitExtension", package: "Tool"),
-                    .product(name: "WebContentExtractor", package: "Tool")
+                    .product(name: "WebContentExtractor", package: "Tool"),
+                    .product(name: "GitHelper", package: "Tool"),
+                    .product(name: "SuggestionBasic", package: "Tool")
                 ]),
             .testTarget(
                 name: "ChatServiceTests",

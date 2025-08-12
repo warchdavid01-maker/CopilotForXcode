@@ -52,7 +52,7 @@ extension View {
         _ configuration: CodeBlockConfiguration,
         backgroundColor: Color,
         labelColor: Color,
-        insertAction: (() -> Void)? = nil
+        context: MarkdownActionProvider? = nil
     ) -> some View {
         background(backgroundColor)
             .clipShape(RoundedRectangle(cornerRadius: 6))
@@ -71,9 +71,11 @@ extension View {
                             NSPasteboard.general.setString(configuration.content, forType: .string)
                         }
                         
-                        InsertButton {
-                            if let insertAction = insertAction {
-                                insertAction()
+                        if let context = context, context.supportInsert {
+                            InsertButton {
+                                if let onInsert = context.onInsert {
+                                    onInsert(configuration.content)
+                                }
                             }
                         }
                     }
@@ -187,3 +189,20 @@ extension View {
     }
 }
 
+// MARK: - Code Review Background Styles
+
+struct CodeReviewCardBackground: View {
+    var body: some View {
+        RoundedRectangle(cornerRadius: 4)
+            .stroke(.black.opacity(0.17), lineWidth: 1)
+            .background(Color.gray.opacity(0.05))
+    }
+}
+
+struct CodeReviewHeaderBackground: View {
+    var body: some View {
+        RoundedRectangle(cornerRadius: 4)
+            .stroke(.black.opacity(0.17), lineWidth: 1)
+            .background(Color.gray.opacity(0.1))
+    }
+}

@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import XcodeInspector
+import ConversationServiceProvider
 
 public struct WidgetLocation: Equatable {
     struct PanelLocation: Equatable {
@@ -357,3 +358,86 @@ enum UpdateLocationStrategy {
     }
 }
 
+public struct CodeReviewLocationStrategy {
+    static func calculateCurrentLineNumber(
+        for originalLineNumber: Int, // 1-based
+        originalLines: [String],
+        currentLines: [String]
+    ) -> Int {
+        let difference = currentLines.difference(from: originalLines)
+
+        let targetIndex = originalLineNumber
+        var adjustment = 0
+
+        for change in difference {
+            switch change {
+            case .insert(let offset, _, _):
+                // Inserted at or before target line
+                if offset <= targetIndex + adjustment {
+                    adjustment += 1
+                }
+            case .remove(let offset, _, _):
+                // Deleted at or before target line
+                if offset <= targetIndex + adjustment {
+                    adjustment -= 1
+                }
+            }
+        }
+
+        return targetIndex + adjustment
+    }
+
+    static func getCurrentLineFrame(
+        editor: AXUIElement, 
+        currentContent: String,
+        comment: ReviewComment, 
+        originalContent: String
+    ) -> (lineNumber: Int?, lineFrame: CGRect?) {
+        let originalLines = originalContent.components(separatedBy: .newlines)
+        let currentLines = currentContent.components(separatedBy: .newlines)
+
+        let originalLineNumber = comment.range.end.line
+        let currentLineNumber = calculateCurrentLineNumber(
+            for: originalLineNumber,
+            originalLines: originalLines,
+            currentLines: currentLines
+        ) // 1-based
+        // Calculate the character position for the start of the target line
+        var characterPosition = 0
+        for i in 0 ..< currentLineNumber {
+            characterPosition += currentLines[i].count + 1 // +1 for newline character
+        }
+
+        var range = CFRange(location: characterPosition, length: currentLines[currentLineNumber].count)
+        let rangeValue = AXValueCreate(AXValueType.cfRange, &range)
+
+        var boundsValue: CFTypeRef?
+        let result = AXUIElementCopyParameterizedAttributeValue(
+            editor,
+            kAXBoundsForRangeParameterizedAttribute as CFString,
+            rangeValue!,
+            &boundsValue
+        )
+
+        if result == .success,
+           let bounds = boundsValue
+        {
+            var rect = CGRect.zero
+            let success = AXValueGetValue(bounds as! AXValue, AXValueType.cgRect, &rect)
+
+            if success == true {
+                return (
+                    currentLineNumber,
+                    CGRect(
+                        x: rect.minX,
+                        y: rect.minY,
+                        width: rect.width,
+                        height: rect.height
+                    )
+                )
+            }
+        }
+
+        return (nil, nil)
+    }
+}

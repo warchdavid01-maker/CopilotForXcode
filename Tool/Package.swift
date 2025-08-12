@@ -64,7 +64,8 @@ let package = Package(
         .library(name: "Cache", targets: ["Cache"]),
         .library(name: "StatusBarItemView", targets: ["StatusBarItemView"]),
         .library(name: "HostAppActivator", targets: ["HostAppActivator"]),
-        .library(name: "AppKitExtension", targets: ["AppKitExtension"])
+        .library(name: "AppKitExtension", targets: ["AppKitExtension"]),
+        .library(name: "GitHelper", targets: ["GitHelper"])
     ],
     dependencies: [
         // TODO: Update LanguageClient some day.
@@ -276,6 +277,7 @@ let package = Package(
         .testTarget(name: "SuggestionProviderTests", dependencies: ["SuggestionProvider"]),
         
         .target(name: "ConversationServiceProvider", dependencies: [
+            "GitHelper",
             .product(name: "CopilotForXcodeKit", package: "CopilotForXcodeKit"),
             .product(name: "LanguageServerProtocol", package: "LanguageServerProtocol"),
         ]),
@@ -360,7 +362,17 @@ let package = Package(
         
         // MARK: - AppKitExtension
         
-        .target(name: "AppKitExtension")
+        .target(name: "AppKitExtension"),
+        
+        // MARK: - GitHelper
+        .target(
+            name: "GitHelper",
+            dependencies: [
+                "Terminal",
+                .product(name: "LanguageServerProtocol", package: "LanguageServerProtocol")
+            ]
+        ),
+        .testTarget(name: "GitHelperTests", dependencies: ["GitHelper"])
     ]
 )
 

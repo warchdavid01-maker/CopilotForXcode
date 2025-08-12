@@ -10,6 +10,7 @@ import GitHubCopilotService
 import Logger
 import OrderedCollections
 import SwiftUI
+import GitHelper
 
 public struct DisplayedChatMessage: Equatable {
     public enum Role: Equatable {
@@ -29,6 +30,7 @@ public struct DisplayedChatMessage: Equatable {
     public var steps: [ConversationProgressStep] = []
     public var editAgentRounds: [AgentRound] = []
     public var panelMessages: [CopilotShowMessageParams] = []
+    public var codeReviewRound: CodeReviewRound? = nil
 
     public init(
         id: String,
@@ -41,7 +43,8 @@ public struct DisplayedChatMessage: Equatable {
         errorMessages: [String] = [],
         steps: [ConversationProgressStep] = [],
         editAgentRounds: [AgentRound] = [],
-        panelMessages: [CopilotShowMessageParams] = []
+        panelMessages: [CopilotShowMessageParams] = [],
+        codeReviewRound: CodeReviewRound? = nil
     ) {
         self.id = id
         self.role = role
@@ -54,6 +57,7 @@ public struct DisplayedChatMessage: Equatable {
         self.steps = steps
         self.editAgentRounds = editAgentRounds
         self.panelMessages = panelMessages
+        self.codeReviewRound = codeReviewRound
     }
 }
 
@@ -73,6 +77,7 @@ struct Chat {
         var typedMessage = ""
         var history: [DisplayedChatMessage] = []
         var isReceivingMessage = false
+        var requestType: ChatService.RequestType? = nil
         var chatMenu = ChatMenu.State()
         var focusedField: Field?
         var currentEditor: FileReference? = nil
@@ -87,6 +92,8 @@ struct Chat {
             case textField
             case fileSearchBar
         }
+        
+        var codeReviewState = ConversationCodeReviewFeature.State()
     }
 
     enum Action: Equatable, BindableAction {
@@ -143,6 +150,9 @@ struct Chat {
         case setDiffViewerController(chat: StoreOf<Chat>)
 
         case agentModeChanged(Bool)
+        
+        // Code Review
+        case codeReview(ConversationCodeReviewFeature.Action)
     }
 
     let service: ChatService
@@ -164,6 +174,10 @@ struct Chat {
 
         Scope(state: \.chatMenu, action: /Action.chatMenu) {
             ChatMenu(service: service)
+        }
+        
+        Scope(state: \.codeReviewState, action: /Action.codeReview) {
+            ConversationCodeReviewFeature(service: service)
         }
 
         Reduce { state, action in
@@ -397,7 +411,8 @@ struct Chat {
                         errorMessages: message.errorMessages,
                         steps: message.steps,
                         editAgentRounds: message.editAgentRounds,
-                        panelMessages: message.panelMessages
+                        panelMessages: message.panelMessages,
+                        codeReviewRound: message.codeReviewRound
                     ))
 
                     return all
@@ -407,6 +422,7 @@ struct Chat {
 
             case .isReceivingMessageChanged:
                 state.isReceivingMessage = service.isReceivingMessage
+                state.requestType = service.requestType
                 return .none
                 
             case .fileEditChanged:
@@ -539,6 +555,9 @@ struct Chat {
 
             case let .agentModeChanged(isAgentMode):
                 state.isAgentMode = isAgentMode
+                return .none
+                
+            case .codeReview:
                 return .none
             }
         }

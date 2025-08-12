@@ -171,4 +171,17 @@ public final class BuiltinExtensionConversationServiceProvider<
         
         return (try? await conversationService.agents(workspace: workspaceInfo))
     }
+    
+    public func reviewChanges(_ params: ReviewChangesParams) async throws -> CodeReviewResult? {
+        guard let conversationService else {
+            Logger.service.error("Builtin chat service not found.")
+            return nil
+        }
+        guard let workspaceInfo = await activeWorkspace() else {
+            Logger.service.error("Could not get active workspace info")
+            return nil
+        }
+        
+        return (try? await conversationService.reviewChanges(workspace: workspaceInfo, params: params))
+    }
 }

@@ -15,6 +15,9 @@ import Workspace
 import XcodeInspector
 import OrderedCollections
 import SystemUtils
+import GitHelper
+import LanguageServerProtocol
+import SuggestionBasic
 
 public protocol ChatServiceType {
     var memory: ContextAwareAutoManagedChatMemory { get set }
@@ -66,10 +69,15 @@ public struct FileEdit: Equatable {
 
 public final class ChatService: ChatServiceType, ObservableObject {
     
+    public enum RequestType: String, Equatable {
+        case conversation, codeReview
+    }
+    
     public var memory: ContextAwareAutoManagedChatMemory
     @Published public internal(set) var chatHistory: [ChatMessage] = []
     @Published public internal(set) var isReceivingMessage = false
     @Published public internal(set) var fileEditMap: OrderedDictionary<URL, FileEdit> = [:]
+    public internal(set) var requestType: RequestType? = nil
     public let chatTabInfo: ChatTabInfo
     private let conversationProvider: ConversationServiceProvider?
     private let conversationProgressHandler: ConversationProgressHandler
@@ -190,13 +198,8 @@ public final class ChatService: ChatServiceType, ObservableObject {
         let chatTabId = self.chatTabInfo.id
         Task {
             let message = ChatMessage(
-                id: turnId,
+                assistantMessageWithId: turnId,
                 chatTabID: chatTabId,
-                clsTurnID: turnId,
-                role: .assistant,
-                content: "",
-                references: [],
-                steps: [],
                 editAgentRounds: editAgentRounds
             )
 
@@ -360,9 +363,8 @@ public final class ChatService: ChatServiceType, ObservableObject {
         }
         
         var chatMessage = ChatMessage(
-            id: id,
-            chatTabID: self.chatTabInfo.id,
-            role: .user,
+            userMessageWithId: id,
+            chatTabId: chatTabInfo.id,
             content: content,
             contentImageReferences: finalImageReferences,
             references: references.toConversationReferences()
@@ -381,8 +383,9 @@ public final class ChatService: ChatServiceType, ObservableObject {
                 // For associating error message with user message
                 currentTurnId = UUID().uuidString
                 chatMessage.clsTurnID = currentTurnId
-                errorMessage = buildErrorMessage(
-                    turnId: currentTurnId!,
+                errorMessage = ChatMessage(
+                    errorMessageWithId: currentTurnId!,
+                    chatTabID: chatTabInfo.id,
                     errorMessages: [
                         currentFileReadability.errorMessage(
                             using: CurrentEditorSkill.readabilityErrorMessageProvider
@@ -407,12 +410,9 @@ public final class ChatService: ChatServiceType, ObservableObject {
                 // there is no turn id from CLS, just set it as id
                 let clsTurnID = UUID().uuidString
                 let progressMessage = ChatMessage(
-                    id: clsTurnID,
-                    chatTabID: self.chatTabInfo.id,
-                    clsTurnID: clsTurnID,
-                    role: .assistant,
-                    content: whatsNewContent,
-                    references: []
+                    assistantMessageWithId: clsTurnID,
+                    chatTabID: chatTabInfo.id,
+                    content: whatsNewContent
                 )
                 await memory.appendMessage(progressMessage)
             }
@@ -625,7 +625,15 @@ public final class ChatService: ChatServiceType, ObservableObject {
         }
         return URL(fileURLWithPath: chatTabInfo.workspacePath)
     }
-
+    
+    private func getProjectRootURL() async throws -> URL? {
+        guard let workspaceURL = getWorkspaceURL() else { return nil }
+        return WorkspaceXcodeWindowInspector.extractProjectURL(
+            workspaceURL: workspaceURL, 
+            documentURL: nil
+        )
+    }
+    
     public func upvote(_ id: String, _ rating: ConversationRating) async {
         try? await conversationProvider?.rateConversation(turnId: id, rating: rating, workspaceURL: getWorkspaceURL())
     }
@@ -675,13 +683,7 @@ public final class ChatService: ChatServiceType, ObservableObject {
             /// Display an initial assistant message immediately after the user sends a message.
             /// This improves perceived responsiveness, especially in Agent Mode where the first
             /// ProgressReport may take long time.
-            let message = ChatMessage(
-                id: turnId,
-                chatTabID: self.chatTabInfo.id,
-                clsTurnID: turnId,
-                role: .assistant,
-                content: ""
-            )
+            let message = ChatMessage(assistantMessageWithId: turnId, chatTabID: chatTabInfo.id)
 
             // will persist in resetOngoingRequest()
             await memory.appendMessage(message)
@@ -727,10 +729,8 @@ public final class ChatService: ChatServiceType, ObservableObject {
 
         Task {
             let message = ChatMessage(
-                id: id,
-                chatTabID: self.chatTabInfo.id,
-                clsTurnID: id,
-                role: .assistant,
+                assistantMessageWithId: id,
+                chatTabID: chatTabInfo.id,
                 content: messageContent,
                 references: messageReferences,
                 steps: messageSteps,
@@ -752,9 +752,11 @@ public final class ChatService: ChatServiceType, ObservableObject {
                 Task {
                     await Status.shared
                         .updateCLSStatus(.warning, busy: false, message: CLSError.message)
-                    let errorMessage = buildErrorMessage(
-                        turnId: progress.turnId,  
-                        panelMessages: [.init(type: .error, title: String(CLSError.code ?? 0), message: CLSError.message, location: .Panel)])
+                    let errorMessage = ChatMessage(
+                        errorMessageWithId: progress.turnId,
+                        chatTabID: chatTabInfo.id,
+                        panelMessages: [.init(type: .error, title: String(CLSError.code ?? 0), message: CLSError.message, location: .Panel)]
+                    )
                     // will persist in resetongoingRequest()
                     await memory.appendMessage(errorMessage)
                     
@@ -779,8 +781,9 @@ public final class ChatService: ChatServiceType, ObservableObject {
                 }
             } else if CLSError.code == 400 && CLSError.message.contains("model is not supported") {
                 Task {
-                    let errorMessage = buildErrorMessage(
-                        turnId: progress.turnId, 
+                    let errorMessage = ChatMessage(
+                        errorMessageWithId: progress.turnId,
+                        chatTabID: chatTabInfo.id,
                         errorMessages: ["Oops, the model is not supported. Please enable it first in [GitHub Copilot settings](https://github.com/settings/copilot)."]
                     )
                     await memory.appendMessage(errorMessage)
@@ -789,7 +792,11 @@ public final class ChatService: ChatServiceType, ObservableObject {
                 }
             } else {
                 Task {
-                    let errorMessage = buildErrorMessage(turnId: progress.turnId, errorMessages: [CLSError.message])
+                    let errorMessage = ChatMessage(
+                        errorMessageWithId: progress.turnId,
+                        chatTabID: chatTabInfo.id,
+                        errorMessages: [CLSError.message]
+                    )
                     // will persist in resetOngoingRequest()
                     await memory.appendMessage(errorMessage)
                     resetOngoingRequest()
@@ -800,11 +807,8 @@ public final class ChatService: ChatServiceType, ObservableObject {
         
         Task {
             let message = ChatMessage(
-                id: progress.turnId,
-                chatTabID: self.chatTabInfo.id,
-                clsTurnID: progress.turnId,
-                role: .assistant,
-                content: "",
+                assistantMessageWithId: progress.turnId, 
+                chatTabID: chatTabInfo.id,
                 followUp: followUp,
                 suggestedTitle: progress.suggestedTitle
             )
@@ -814,25 +818,10 @@ public final class ChatService: ChatServiceType, ObservableObject {
         }
     }
     
-    private func buildErrorMessage(
-        turnId: String, 
-        errorMessages: [String] = [], 
-        panelMessages: [CopilotShowMessageParams] = []
-    ) -> ChatMessage {
-        return .init(
-            id: turnId,
-            chatTabID: chatTabInfo.id,
-            clsTurnID: turnId,
-            role: .assistant,
-            content: "",
-            errorMessages: errorMessages,
-            panelMessages: panelMessages
-        )
-    }
-    
     private func resetOngoingRequest() {
         activeRequestId = nil
         isReceivingMessage = false
+        requestType = nil
 
         // cancel all pending tool call requests
         for (_, request) in pendingToolCallRequests {
@@ -876,6 +865,15 @@ public final class ChatService: ChatServiceType, ObservableObject {
                         }
                     }
                 }
+                
+                if history[lastIndex].codeReviewRound != nil,
+                   (
+                    history[lastIndex].codeReviewRound!.status == .waitForConfirmation
+                    || history[lastIndex].codeReviewRound!.status == .running
+                   )
+                {
+                    history[lastIndex].codeReviewRound!.status = .cancelled
+                }
             })
 
             // The message of progress report could change rapidly
@@ -890,6 +888,7 @@ public final class ChatService: ChatServiceType, ObservableObject {
     private func sendConversationRequest(_ request: ConversationRequest) async throws {
         guard !isReceivingMessage else { throw CancellationError() }
         isReceivingMessage = true
+        requestType = .conversation
         
         do {
             if let conversationId = conversationId {
@@ -1102,5 +1101,166 @@ extension [ChatMessage] {
             }
         }
         return content
+    }
+}
+
+// MARK: Copilot Code Review
+
+extension ChatService {
+    
+    public func requestCodeReview(_ group: GitDiffGroup) async throws {
+        guard activeRequestId == nil else { return }
+        activeRequestId = UUID().uuidString
+        
+        guard !isReceivingMessage else {
+            activeRequestId = nil
+            throw CancellationError() 
+        }
+        isReceivingMessage = true
+        requestType = .codeReview
+        
+        do {
+            await CodeReviewService.shared.resetComments()
+            
+            let turnId = UUID().uuidString
+            
+            await addCodeReviewUserMessage(id: UUID().uuidString, turnId: turnId, group: group)
+            
+            let initialBotMessage = ChatMessage(
+                assistantMessageWithId: turnId, 
+                chatTabID: chatTabInfo.id
+            )
+            await memory.appendMessage(initialBotMessage)
+            
+            guard let projectRootURL = try await getProjectRootURL()
+            else {
+                let round = CodeReviewRound.fromError(turnId: turnId, error: "Invalid git repository.")
+                await appendCodeReviewRound(round)
+                resetOngoingRequest()
+                return
+            }
+            
+            let prChanges = await CurrentChangeService.getPRChanges(
+                projectRootURL, 
+                group: group,
+                shouldIncludeFile: shouldIncludeFileForReview
+            )
+            guard !prChanges.isEmpty else {
+                let round = CodeReviewRound.fromError(
+                    turnId: turnId, 
+                    error: group == .index ? "No staged changes found to review." : "No unstaged changes found to review."
+                )
+                await appendCodeReviewRound(round)
+                resetOngoingRequest()
+                return
+            }
+                        
+            let round: CodeReviewRound = .init(
+                turnId: turnId,
+                status: .waitForConfirmation,
+                request: .from(prChanges)
+            )
+            await appendCodeReviewRound(round)
+        } catch {
+            resetOngoingRequest()
+            throw error
+        }
+    }
+    
+    private func shouldIncludeFileForReview(url: URL) -> Bool {
+        let codeLanguage = CodeLanguage(fileURL: url)
+        
+        if case .builtIn = codeLanguage {
+            return true
+        } else {
+            return false
+        }
+    }
+
+    private func appendCodeReviewRound(_ round: CodeReviewRound) async {
+        let message = ChatMessage(
+            assistantMessageWithId: round.turnId, chatTabID: chatTabInfo.id, codeReviewRound: round
+        )
+        
+        await memory.appendMessage(message)
+    }
+    
+    private func getCurrentCodeReviewRound(_ id: String) async -> CodeReviewRound? {
+        guard let lastBotMessage = await memory.history.last, 
+              lastBotMessage.role == .assistant,
+              let codeReviewRound = lastBotMessage.codeReviewRound,
+              codeReviewRound.id == id
+        else {
+            return nil
+        }
+        
+        return codeReviewRound
+    }
+    
+    public func acceptCodeReview(_ id: String, selectedFileUris: [DocumentUri]) async {
+        guard activeRequestId != nil, isReceivingMessage else { return }
+        
+        guard var round = await getCurrentCodeReviewRound(id),
+              var request = round.request,
+              round.status.canTransitionTo(.accepted)
+        else { return }
+        
+        guard selectedFileUris.count > 0 else {
+            round = round.withError("No files are selected to review.")
+            await appendCodeReviewRound(round)
+            resetOngoingRequest()
+            return
+        }
+        
+        round.status = .accepted
+        request.updateSelectedChanges(by: selectedFileUris)
+        round.request = request
+        await appendCodeReviewRound(round)
+        
+        round.status = .running
+        await appendCodeReviewRound(round)
+        
+        let (fileComments, errorMessage) = await CodeReviewProvider.invoke(
+            request,
+            context: CodeReviewServiceProvider(conversationServiceProvider: conversationProvider)
+        )
+        
+        if let errorMessage = errorMessage {
+            round = round.withError(errorMessage)
+            await appendCodeReviewRound(round)
+            resetOngoingRequest()
+            return
+        } 
+        
+        round = round.withResponse(.init(fileComments: fileComments))
+        await CodeReviewService.shared.updateComments(fileComments)
+        await appendCodeReviewRound(round)
+        
+        round.status = .completed
+        await appendCodeReviewRound(round)
+        
+        resetOngoingRequest()
+    }
+    
+    public func cancelCodeReview(_ id: String) async {
+        guard activeRequestId != nil, isReceivingMessage else { return }
+        
+        guard var round = await getCurrentCodeReviewRound(id),
+              round.status.canTransitionTo(.cancelled)
+        else { return }
+        
+        round.status = .cancelled
+        await appendCodeReviewRound(round)
+        
+        resetOngoingRequest()
+    }
+    
+    private func addCodeReviewUserMessage(id: String, turnId: String, group: GitDiffGroup) async {
+        let content = group == .index
+            ? "Code review for staged changes."
+            : "Code review for unstaged changes."
+        let chatMessage = ChatMessage(userMessageWithId: id, chatTabId: chatTabInfo.id, content: content)
+        await memory.appendMessage(chatMessage)
+        saveChatMessageToStorage(chatMessage)
     }
 }

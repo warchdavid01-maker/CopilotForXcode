@@ -111,6 +111,8 @@ public struct ChatMessage: Equatable, Codable {
     
     public var panelMessages: [CopilotShowMessageParams]
     
+    public var codeReviewRound: CodeReviewRound?
+    
     /// The timestamp of the message.
     public var createdAt: Date
     public var updatedAt: Date
@@ -130,6 +132,7 @@ public struct ChatMessage: Equatable, Codable {
         steps: [ConversationProgressStep] = [],
         editAgentRounds: [AgentRound] = [],
         panelMessages: [CopilotShowMessageParams] = [],
+        codeReviewRound: CodeReviewRound? = nil,
         createdAt: Date? = nil,
         updatedAt: Date? = nil
     ) {
@@ -147,10 +150,71 @@ public struct ChatMessage: Equatable, Codable {
         self.steps = steps
         self.editAgentRounds = editAgentRounds
         self.panelMessages = panelMessages
+        self.codeReviewRound = codeReviewRound
 
         let now = Date.now
         self.createdAt = createdAt ?? now
         self.updatedAt = updatedAt ?? now
+    }
+    
+    public init(
+        userMessageWithId id: String,
+        chatTabId: String,
+        content: String,
+        contentImageReferences: [ImageReference] = [],
+        references: [ConversationReference] = []
+    ) {
+        self.init(
+            id: id,
+            chatTabID: chatTabId,
+            role: .user,
+            content: content,
+            contentImageReferences: contentImageReferences,
+            references: references
+        )
+    }
+    
+    public init(
+        assistantMessageWithId id: String, // TurnId
+        chatTabID: String,
+        content: String = "",
+        references: [ConversationReference] = [],
+        followUp: ConversationFollowUp? = nil,
+        suggestedTitle: String? = nil,
+        steps: [ConversationProgressStep] = [],
+        editAgentRounds: [AgentRound] = [],
+        codeReviewRound: CodeReviewRound? = nil
+    ) {
+        self.init(
+            id: id,
+            chatTabID: chatTabID,
+            clsTurnID: id,
+            role: .assistant,
+            content: content,
+            references: references,
+            followUp: followUp,
+            suggestedTitle: suggestedTitle,
+            steps: steps,
+            editAgentRounds: editAgentRounds,
+            codeReviewRound: codeReviewRound
+        )
+    }
+    
+    public init(
+        errorMessageWithId id: String, // TurnId
+        chatTabID: String,
+        errorMessages: [String] = [],
+        panelMessages: [CopilotShowMessageParams] = []
+    ) {
+        self.init(
+            id: id,
+            chatTabID: chatTabID,
+            clsTurnID: id,
+            role: .assistant,
+            content: "",
+            errorMessages: errorMessages,
+            panelMessages: panelMessages
+        )
     }
 }
 

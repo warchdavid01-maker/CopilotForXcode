@@ -18,6 +18,7 @@ class ServerRequestHandlerImpl : ServerRequestHandler {
     private let conversationContextHandler: ConversationContextHandler = ConversationContextHandlerImpl.shared
     private let watchedFilesHandler: WatchedFilesHandler = WatchedFilesHandlerImpl.shared
     private let showMessageRequestHandler: ShowMessageRequestHandler = ShowMessageRequestHandlerImpl.shared
+    private let mcpOAuthRequestHandler: MCPOAuthRequestHandler = MCPOAuthRequestHandlerImpl.shared
 
     func handleRequest(_ request: AnyJSONRPCRequest, workspaceURL: URL, callback: @escaping ResponseHandler, service: GitHubCopilotService?) {
         let methodName = request.method
@@ -58,6 +59,18 @@ class ServerRequestHandlerImpl : ServerRequestHandler {
                 let params = try JSONEncoder().encode(request.params)
                 let invokeParams = try JSONDecoder().decode(InvokeClientToolParams.self, from: params)
                 ClientToolHandlerImpl.shared.invokeClientToolConfirmation(InvokeClientToolConfirmationRequest(id: request.id, method: request.method, params: invokeParams), completion: legacyResponseHandler)
+
+            case "copilot/mcpOAuth":
+                let params = try JSONEncoder().encode(request.params)
+                let mcpOAuthRequestParams = try JSONDecoder().decode(MCPOAuthRequestParams.self, from: params)
+                mcpOAuthRequestHandler.handleShowOAuthMessage(
+                    MCPOAuthRequest(
+                        id: request.id,
+                        method: request.method,
+                        params: mcpOAuthRequestParams
+                    ),
+                    completion: legacyResponseHandler
+                )
 
             default:
                 break

@@ -19,6 +19,7 @@ struct BotMessage: View {
     let steps: [ConversationProgressStep]
     let editAgentRounds: [AgentRound]
     let panelMessages: [CopilotShowMessageParams]
+    let codeReviewRound: CodeReviewRound?
     
     @Environment(\.colorScheme) var colorScheme
     @AppStorage(\.chatFontSize) var chatFontSize
@@ -121,7 +122,6 @@ struct BotMessage: View {
         HStack {
             VStack(alignment: .leading, spacing: 8) {
                 CopilotMessageHeader()
-                    .padding(.leading, 6)
                 
                 if !references.isEmpty {
                     WithPerceptionTracking {
@@ -152,6 +152,12 @@ struct BotMessage: View {
 
                 if !text.isEmpty {
                     ThemedMarkdownText(text: text, chat: chat)
+                }
+                
+                if let codeReviewRound = codeReviewRound {
+                    CodeReviewMainView(
+                        store: chat, round: codeReviewRound
+                    )
                 }
 
                 if !errorMessages.isEmpty {
@@ -339,7 +345,8 @@ struct BotMessage_Previews: PreviewProvider {
             chat: .init(initialState: .init(), reducer: { Chat(service: ChatService.service(for: chatTabInfo)) }),
             steps: steps,
             editAgentRounds: agentRounds,
-            panelMessages: []
+            panelMessages: [],
+            codeReviewRound: nil
         )
         .padding()
         .fixedSize(horizontal: true, vertical: true)

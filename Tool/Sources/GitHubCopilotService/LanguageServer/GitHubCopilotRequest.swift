@@ -408,6 +408,20 @@ enum GitHubCopilotRequest {
             .custom("conversation/agents", .hash([:]), ClientRequest.NullHandler)
         }
     }
+    
+    // MARK: - Code Review
+    
+    struct ReviewChanges: GitHubCopilotRequestType {
+        typealias Response = CodeReviewResult
+        
+        var params: ReviewChangesParams
+        
+        var request: ClientRequest {
+            let data = (try? JSONEncoder().encode(params)) ?? Data()
+            let dict = (try? JSONDecoder().decode(JSONValue.self, from: data)) ?? .hash([:])
+            return .custom("copilot/codeReview/reviewChanges", dict, ClientRequest.NullHandler)
+        }
+    }
 
     struct RegisterTools: GitHubCopilotRequestType {
         struct Response: Codable {}

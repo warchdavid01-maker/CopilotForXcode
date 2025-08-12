@@ -120,6 +120,10 @@ public final actor Status {
     public func getCLSStatus() -> CLSStatus {
         clsStatus
     }
+    
+    public func getQuotaInfo() -> GitHubCopilotQuotaInfo? {
+        currentUserQuotaInfo
+    }
 
     public func getStatus() -> StatusResponse {
         let authStatusInfo: AuthStatusInfo = getAuthStatusInfo()

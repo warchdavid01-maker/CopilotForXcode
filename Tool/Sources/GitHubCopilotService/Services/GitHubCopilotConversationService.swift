@@ -115,5 +115,11 @@ public final class GitHubCopilotConversationService: ConversationServiceType {
         guard let service = await serviceLocator.getService(from: workspace) else { return nil }
         return try await service.agents()
     }
+    
+    public func reviewChanges(workspace: WorkspaceInfo, params: ReviewChangesParams) async throws -> CodeReviewResult? {
+        guard let service = await serviceLocator.getService(from: workspace) else { return nil }
+        
+        return try await service.reviewChanges(params: params)
+    }
 }
 

@@ -13,6 +13,9 @@ import ChatTab
 import Workspace
 import Persist
 import UniformTypeIdentifiers
+import Status
+import GitHubCopilotService
+import GitHubCopilotViewModel
 
 private let r: Double = 4
 
@@ -385,7 +388,8 @@ struct ChatHistoryItem: View {
                     chat: chat,
                     steps: message.steps,
                     editAgentRounds: message.editAgentRounds,
-                    panelMessages: message.panelMessages
+                    panelMessages: message.panelMessages,
+                    codeReviewRound: message.codeReviewRound
                 )
             case .ignored:
                 EmptyView()
@@ -509,6 +513,37 @@ struct ChatPanelInputArea: View {
         @State private var isCurrentEditorContextEnabled: Bool = UserDefaults.shared.value(
             for: \.enableCurrentEditorContext
         )
+        @ObservedObject private var status: StatusObserver = .shared
+        @State private var isCCRFFEnabled: Bool
+        @State private var cancellables = Set<AnyCancellable>()
+        
+        init(
+            chat: StoreOf<Chat>,
+            focusedField: FocusState<Chat.State.Field?>.Binding
+        ) {
+            self.chat = chat
+            self.focusedField = focusedField
+            self.isCCRFFEnabled = FeatureFlagNotifierImpl.shared.featureFlags.ccr
+        }
+        
+        var isRequestingConversation: Bool {
+            if chat.isReceivingMessage,
+               let requestType = chat.requestType,
+               requestType == .conversation {
+                return true
+            }
+            return false
+        }
+        
+        var isRequestingCodeReview: Bool {
+            if chat.isReceivingMessage,
+               let requestType = chat.requestType,
+               requestType == .codeReview {
+                return true
+            }
+            
+            return false
+        }
 
         var body: some View {
             WithPerceptionTracking {
@@ -587,11 +622,19 @@ struct ChatPanelInputArea: View {
 
                         Spacer()
                         
-                        Group {
-                            if chat.isReceivingMessage { stopButton }
-                            else { sendButton }
+                        codeReviewButton
+                            .buttonStyle(HoverButtonStyle(padding: 0))
+                            .disabled(isRequestingConversation)
+                        
+                        ZStack {
+                            sendButton
+                                .opacity(isRequestingConversation ? 0 : 1)
+                            
+                            stopButton
+                                .opacity(isRequestingConversation ? 1 : 0)
                         }
                         .buttonStyle(HoverButtonStyle(padding: 0))
+                        .disabled(isRequestingCodeReview)
                     }
                     .padding(8)
                     .padding(.top, -4)
@@ -601,6 +644,16 @@ struct ChatPanelInputArea: View {
                 }
                 .onAppear() {
                     subscribeToActiveDocumentChangeEvent()
+                    // Check quota for CCR
+                    Task {
+                        if status.quotaInfo == nil,
+                           let service = try? GitHubCopilotViewModel.shared.getGitHubCopilotAuthService() {
+                            _ = try? await service.checkQuota()
+                        }
+                    }
+                }
+                .task {
+                    subscribeToFeatureFlagsDidChangeEvent()
                 }
                 .background {
                     RoundedRectangle(cornerRadius: 6)
@@ -627,6 +680,7 @@ struct ChatPanelInputArea: View {
                     .keyboardShortcut("l", modifiers: [.command])
                     .accessibilityHidden(true)
                 }
+                
             }
         }
         
@@ -648,7 +702,78 @@ struct ChatPanelInputArea: View {
                 Image(systemName: "stop.circle")
                     .padding(4)
             }
-            .help("Stop")
+        }
+        
+        private var shouldEnableCCR: Bool {
+            guard let quotaInfo = status.quotaInfo else { return false }
+            
+            if quotaInfo.isFreeUser { return false }
+            
+            if !isCCRFFEnabled { return false }
+            
+            return true
+        }
+        
+        private var ccrDisabledTooltip: String {
+            guard let quotaInfo = status.quotaInfo else {
+                return "GitHub Copilot Code Review is not available."
+            }
+            
+            if quotaInfo.isFreeUser {
+                return "GitHub Copilot Code Review requires a paid subscription."
+            }
+            
+            if !isCCRFFEnabled { 
+                return "GitHub Copilot Code Review is disabled by org policy. Contact your admin."
+            }
+            
+            return "GitHub Copilot Code Review is temporarily unavailable."
+        }
+        
+        var codeReviewIcon: some View {
+            Image("codeReview")
+                .padding(6)
+        }
+        
+        private var codeReviewButton: some View {
+            Group {
+                if !shouldEnableCCR {
+                    codeReviewIcon
+                        .foregroundColor(Color(nsColor: .tertiaryLabelColor))
+                        .help(ccrDisabledTooltip)
+                } else {
+                    ZStack {
+                        stopButton
+                            .opacity(isRequestingCodeReview ? 1 : 0)
+                            .help("Stop Code Review")
+                        
+                        Menu {
+                            Button(action: {
+                                chat.send(.codeReview(.request(.index)))
+                            }) {
+                                Text("Review Staged Changes")
+                            }
+                            
+                            Button(action: {
+                                chat.send(.codeReview(.request(.workingTree)))
+                            }) {
+                                Text("Review Unstaged Changes")
+                            }
+                        } label: {
+                            codeReviewIcon
+                        }
+                        .opacity(isRequestingCodeReview ? 0 : 1)
+                        .help("Code Review")
+                    }
+                    .buttonStyle(HoverButtonStyle(padding: 0))
+                }
+            }
+        }
+        
+        private func subscribeToFeatureFlagsDidChangeEvent() {
+            FeatureFlagNotifierImpl.shared.featureFlagsDidChange
+                .sink(receiveValue: { isCCRFFEnabled = $0.ccr })
+                .store(in: &cancellables)
         }
         
         private var dropdownOverlay: some View {

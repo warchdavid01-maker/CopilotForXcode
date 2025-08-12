@@ -1,0 +1,213 @@
+import ComposableArchitecture
+import ConversationServiceProvider
+import LanguageServerProtocol
+import SharedUIComponents
+import SwiftUI
+
+// MARK: - File Selection Section
+
+struct FileSelectionSection: View {
+    let store: StoreOf<Chat>
+    let round: CodeReviewRound
+    let changedFileUris: [DocumentUri]
+    @Binding var selectedFileUris: [DocumentUri]
+    @AppStorage(\.chatFontSize) private var chatFontSize
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            FileSelectionHeader(fileCount: selectedFileUris.count)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            
+            FileSelectionList(
+                store: store,
+                fileUris: changedFileUris,
+                reviewStatus: round.status,
+                selectedFileUris: $selectedFileUris
+            )
+            
+            if round.status == .waitForConfirmation {
+                FileSelectionActions(
+                    store: store,
+                    roundId: round.id,
+                    selectedFileUris: selectedFileUris
+                )
+            }
+        }
+        .padding(12)
+        .background(CodeReviewCardBackground())
+    }
+}
+
+// MARK: - File Selection Components
+
+private struct FileSelectionHeader: View {
+    let fileCount: Int
+    @AppStorage(\.chatFontSize) private var chatFontSize
+    
+    var body: some View {
+        HStack(alignment: .top, spacing: 6) {
+            Image("Sparkle")
+                .resizable()
+                .frame(width: 16, height: 16)
+            
+            Text("You’ve selected following \(fileCount) file(s) with code changes. Review them or unselect any files you don't need, then click Continue.")
+                .font(.system(size: chatFontSize))
+                .multilineTextAlignment(.leading)
+        }
+    }
+}
+
+private struct FileSelectionActions: View {
+    let store: StoreOf<Chat>
+    let roundId: String
+    let selectedFileUris: [DocumentUri]
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            Button("Cancel") {
+                store.send(.codeReview(.cancel(id: roundId)))
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            
+            Button("Continue") {
+                store.send(.codeReview(.accept(id: roundId, selectedFiles: selectedFileUris)))
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+        }
+    }
+}
+
+// MARK: - File Selection List
+
+private struct FileSelectionList: View {
+    let store: StoreOf<Chat>
+    let fileUris: [DocumentUri]
+    let reviewStatus: CodeReviewRound.Status
+    @State private var isExpanded = false
+    @Binding var selectedFileUris: [DocumentUri]
+    @AppStorage(\.chatFontSize) private var chatFontSize
+    
+    private static let defaultVisibleFileCount = 5
+    
+    private var hasMoreFiles: Bool {
+        fileUris.count > Self.defaultVisibleFileCount
+    }
+    
+    var body: some View {
+        let visibleFileUris = Array(fileUris.prefix(Self.defaultVisibleFileCount))
+        let additionalFileUris = Array(fileUris.dropFirst(Self.defaultVisibleFileCount))
+        
+        WithPerceptionTracking {
+            VStack(alignment: .leading, spacing: 4) {
+                FileToggleList(
+                    fileUris: visibleFileUris,
+                    reviewStatus: reviewStatus,
+                    selectedFileUris: $selectedFileUris
+                )
+                
+                if hasMoreFiles {
+                    if !isExpanded {
+                        ExpandFilesButton(isExpanded: $isExpanded)
+                    }
+                    
+                    if isExpanded {
+                        FileToggleList(
+                            fileUris: additionalFileUris,
+                            reviewStatus: reviewStatus,
+                            selectedFileUris: $selectedFileUris
+                        )
+                    }
+                }
+            }
+        }
+        .frame(alignment: .leading)
+    }
+}
+
+private struct ExpandFilesButton: View {
+    @Binding var isExpanded: Bool
+    @AppStorage(\.chatFontSize) private var chatFontSize
+    
+    var body: some View {
+        HStack(spacing: 2) {
+            Image("chevron.down")
+                .resizable()
+                .frame(width: 16, height: 16)
+            
+            Button(action: { isExpanded = true }) {
+                Text("Show more")
+                    .font(.system(size: chatFontSize))
+                    .underline()
+                    .lineSpacing(20)
+            }
+            .buttonStyle(PlainButtonStyle())
+        }
+        .foregroundColor(.blue)
+    }
+}
+
+private struct FileToggleList: View {
+    let fileUris: [DocumentUri]
+    let reviewStatus: CodeReviewRound.Status
+    @Binding var selectedFileUris: [DocumentUri]
+    
+    var body: some View {
+        ForEach(fileUris, id: \.self) { fileUri in
+            FileSelectionRow(
+                fileUri: fileUri,
+                reviewStatus: reviewStatus,
+                isSelected: createSelectionBinding(for: fileUri)
+            )
+        }
+    }
+    
+    private func createSelectionBinding(for fileUri: DocumentUri) -> Binding<Bool> {
+        Binding<Bool>(
+            get: { selectedFileUris.contains(fileUri) },
+            set: { isSelected in
+                if isSelected {
+                    if !selectedFileUris.contains(fileUri) {
+                        selectedFileUris.append(fileUri)
+                    }
+                } else {
+                    selectedFileUris.removeAll { $0 == fileUri }
+                }
+            }
+        )
+    }
+}
+
+private struct FileSelectionRow: View {
+    let fileUri: DocumentUri
+    let reviewStatus: CodeReviewRound.Status
+    @Binding var isSelected: Bool
+    
+    private var fileURL: URL? {
+        URL(string: fileUri)
+    }
+    
+    private var isInteractionEnabled: Bool {
+        reviewStatus == .waitForConfirmation
+    }
+    
+    var body: some View {
+        HStack {
+            Toggle(isOn: $isSelected) {
+                HStack(spacing: 8) {
+                    drawFileIcon(fileURL)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 16, height: 16)
+                    
+                    Text(fileURL?.lastPathComponent ?? fileUri)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+            }
+            .toggleStyle(CheckboxToggleStyle())
+            .disabled(!isInteractionEnabled)
+        }
+    }
+}

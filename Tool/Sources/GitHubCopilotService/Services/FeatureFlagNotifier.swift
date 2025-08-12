@@ -30,6 +30,7 @@ public struct FeatureFlags: Hashable, Codable {
     public var projectContext: Bool
     public var agentMode: Bool
     public var mcp: Bool
+    public var ccr: Bool // Copilot Code Review
     public var activeExperimentForFeatureFlags: ActiveExperimentForFeatureFlags
     
     public init(
@@ -40,6 +41,7 @@ public struct FeatureFlags: Hashable, Codable {
         projectContext: Bool = true,
         agentMode: Bool = true,
         mcp: Bool = true,
+        ccr: Bool = true,
         activeExperimentForFeatureFlags: ActiveExperimentForFeatureFlags = [:]
     ) {
         self.restrictedTelemetry = restrictedTelemetry
@@ -49,6 +51,7 @@ public struct FeatureFlags: Hashable, Codable {
         self.projectContext = projectContext
         self.agentMode = agentMode
         self.mcp = mcp
+        self.ccr = ccr
         self.activeExperimentForFeatureFlags = activeExperimentForFeatureFlags
     }
 }
@@ -84,6 +87,7 @@ public class FeatureFlagNotifierImpl: FeatureFlagNotifier {
         self.featureFlags.inlineChat = chatEnabled
         self.featureFlags.agentMode = self.didChangeFeatureFlagsParams.token["agent_mode"] != "0"
         self.featureFlags.mcp = self.didChangeFeatureFlagsParams.token["mcp"] != "0"
+        self.featureFlags.ccr = self.didChangeFeatureFlagsParams.token["ccr"] != "0"
         self.featureFlags.activeExperimentForFeatureFlags = self.didChangeFeatureFlagsParams.activeExps
     }
 

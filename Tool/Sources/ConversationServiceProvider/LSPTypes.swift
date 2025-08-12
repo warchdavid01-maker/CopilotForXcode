@@ -342,3 +342,66 @@ public struct ActionCommand: Codable, Equatable, Hashable {
     public var commandId: String
     public var args: LSPAny?
 }
+
+// MARK: - Copilot Code Review
+
+public struct ReviewChangesParams: Codable, Equatable {
+    public struct Change: Codable, Equatable {
+        public let uri: DocumentUri
+        public let path: String
+        // The original content of the file before changes were made. Will be empty string if the file is new.
+        public let baseContent: String
+        // The current content of the file with changes applied. Will be empty string if the file is deleted.
+        public let headContent: String
+        
+        public init(uri: DocumentUri, path: String, baseContent: String, headContent: String) {
+            self.uri = uri
+            self.path = path
+            self.baseContent = baseContent
+            self.headContent = headContent
+        }
+    }
+    
+    public let changes: [Change]
+    
+    public init(changes: [Change]) {
+        self.changes = changes
+    }
+}
+
+public struct ReviewComment: Codable, Equatable, Hashable {
+    // Self-defined `id` for using in comment operation. Add an init value to bypass decoding
+    public let id: String = UUID().uuidString
+    public let uri: DocumentUri
+    public let range: LSPRange
+    public let message: String
+    // enum: bug, performance, consistency, documentation, naming, readability, style, other
+    public let kind: String
+    // enum: low, medium, high
+    public let severity: String
+    public let suggestion: String?
+    
+    public init(
+        uri: DocumentUri,
+        range: LSPRange,
+        message: String,
+        kind: String,
+        severity: String,
+        suggestion: String?
+    ) {
+        self.uri = uri
+        self.range = range
+        self.message = message
+        self.kind = kind
+        self.severity = severity
+        self.suggestion = suggestion
+    }
+}
+
+public struct CodeReviewResult: Codable, Equatable {
+    public let comments: [ReviewComment]
+    
+    public init(comments: [ReviewComment]) {
+        self.comments = comments
+    }
+}
