@@ -1,12 +1,19 @@
-### GitHub Copilot for Xcode 0.40.0
+### GitHub Copilot for Xcode 0.41.0
 
 **🚀 Highlights**
 
-* Performance: Fixed a freezing issue in 'Add Context' view when opening large projects.
-* Support disabling Agent mode when it's disabled by policy.
+* Code review feature.
+* Chat: Support for new model `GPT-5`.
+* Agent mode: Added support for new tool to read web URL contents.
+* Support disabling MCP when it's disabled by policy.
+* Support for opening MCP logs directly from the MCP settings page.
+* OAuth support for remote GitHub MCP server.
+
+**💪 Improvements**
+
+* Performance: Improved instant-apply speed for edit_file tool.
 
 **🛠️ Bug Fixes**
 
-* Login failed due to insufficient permissions on the .config folder.
-* Fixed an issue that setting changes like proxy config did not take effect.
-* Increased the timeout for ask mode to prevent response failures due to timeout.
+* Chat Agent repeatedly reverts its own changes when editing the same file.
+* Performance: Avoid chat panel being stuck when sending a large text for chat.

@@ -43,6 +43,10 @@ public class StatusObserver: ObservableObject {
         let authStatus = await Status.shared.getAuthStatus()
         let statusInfo = await Status.shared.getStatus()
         
+        if authStatus.status == .notLoggedIn {
+            await Status.shared.updateQuotaInfo(nil)
+        }
+        
         self.authStatus = AuthStatus(
             status: authStatus.status,
             username: statusInfo.userName,

@@ -704,25 +704,13 @@ struct ChatPanelInputArea: View {
             }
         }
         
-        private var shouldEnableCCR: Bool {
-            guard let quotaInfo = status.quotaInfo else { return false }
-            
-            if quotaInfo.isFreeUser { return false }
-            
-            if !isCCRFFEnabled { return false }
-            
-            return true
+        private var isFreeUser: Bool {
+            guard let quotaInfo = status.quotaInfo else { return true }
+
+            return quotaInfo.isFreeUser
         }
         
         private var ccrDisabledTooltip: String {
-            guard let quotaInfo = status.quotaInfo else {
-                return "GitHub Copilot Code Review is not available."
-            }
-            
-            if quotaInfo.isFreeUser {
-                return "GitHub Copilot Code Review requires a paid subscription."
-            }
-            
             if !isCCRFFEnabled { 
                 return "GitHub Copilot Code Review is disabled by org policy. Contact your admin."
             }
@@ -737,11 +725,9 @@ struct ChatPanelInputArea: View {
         
         private var codeReviewButton: some View {
             Group {
-                if !shouldEnableCCR {
-                    codeReviewIcon
-                        .foregroundColor(Color(nsColor: .tertiaryLabelColor))
-                        .help(ccrDisabledTooltip)
-                } else {
+                if isFreeUser {
+                    // Show nothing
+                } else if isCCRFFEnabled {
                     ZStack {
                         stopButton
                             .opacity(isRequestingCodeReview ? 1 : 0)
@@ -766,6 +752,10 @@ struct ChatPanelInputArea: View {
                         .help("Code Review")
                     }
                     .buttonStyle(HoverButtonStyle(padding: 0))
+                } else {
+                    codeReviewIcon
+                        .foregroundColor(Color(nsColor: .tertiaryLabelColor))
+                        .help(ccrDisabledTooltip)
                 }
             }
         }

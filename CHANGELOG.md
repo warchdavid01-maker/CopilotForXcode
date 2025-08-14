@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.41.0 - August 14, 2025
+### Added
+- Code review feature.
+- Chat: Support for new model GPT-5.
+- Agent mode: Added support for new tool to read web URL contents.
+- Support disabling MCP when it's disabled by policy.
+- Support for opening MCP logs directly from the MCP settings page.
+- OAuth support for remote GitHub MCP server.
+
+### Changed
+- Performance: Improved instant-apply speed for edit_file tool.
+
+### Fixed
+- Chat Agent repeatedly reverts its own changes when editing the same file.
+- Performance: Avoid chat panel being stuck when sending a large text for chat.
+
 ## 0.40.0 - July 24, 2025
 ### Added
 - Support disabling Agent mode when it's disabled by policy.

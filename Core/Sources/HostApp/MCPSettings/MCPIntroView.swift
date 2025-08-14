@@ -154,6 +154,21 @@ struct MCPIntroView: View {
             fileURLWithPath: FileLoggingLocation.mcpRuntimeLogsPath.description,
             isDirectory: true
         )
+        
+        // Create directory if it doesn't exist
+        if !FileManager.default.fileExists(atPath: url.path) {
+            do {
+                try FileManager.default.createDirectory(
+                    atPath: url.path,
+                    withIntermediateDirectories: true,
+                    attributes: nil
+                )
+            } catch {
+                Logger.client.error("Failed to create MCP runtime log folder: \(error)")
+                return
+            }
+        }
+        
         NSWorkspace.shared.open(url)
     }
 }
